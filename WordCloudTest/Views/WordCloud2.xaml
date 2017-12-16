@@ -4,11 +4,10 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="600"
+             d:DesignHeight="500" d:DesignWidth="500"
              DataContextChanged="WordCloud2_OnDataContextChanged">
-    <Grid Height="Auto" Width="Auto" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <Image x:Name="BaseImage" Stretch="None" HorizontalAlignment="Center" Height="600" Width="600" Margin="0">
-
+    <Grid Name="LayoutRoot">
+        <Image x:Name="BaseImage" Stretch="None" SnapsToDevicePixels="True">
         </Image>
     </Grid>
 </UserControl>

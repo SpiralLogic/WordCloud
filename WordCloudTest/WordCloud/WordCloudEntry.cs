@@ -36,7 +36,7 @@ namespace WordCloudTest.WordClouds
         /// <value>
         /// The size value.
         /// </value>
-        public int SizeValue { get; set; }
+        public int wordWeight { get; set; }
 
         /// <summary>
         /// Gets or sets the word.

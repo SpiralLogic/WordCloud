@@ -17,90 +17,166 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2 : UserControl
     {
+        private const int MaxWords = 30;
         private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
         private Point _initScale;
-        private Point _nextTransform;
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         private int _currentWord = 0;
         private Rect _geoSize = new Rect();
+        private DrawingImage _di;
+        private DrawingGroup _mainDrawingGroup;
+
+        private double _spiralPosition = 0.0;
+        private CenterPoints _currentCenterPoint = CenterPoints.M;
+        private double _fontMultiplier;
+        private int _minWordWeight;
+        private DrawingGroup _debugDrawingGroup = new DrawingGroup();
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
 
         public WordCloud2()
         {
             InitializeComponent();
 
-            _initScale = new Point(5, 5);
-            _nextTransform = new Point(0, 0);
+            _di = new DrawingImage();
+
+            _mainDrawingGroup = new DrawingGroup();
+            _di.Drawing = _mainDrawingGroup;
+
+            BaseImage.Source = _di;
         }
 
-        public void DoStuff()
+        private void Setup()
         {
-            var wordCount = _words.Count;
-            var word = _words[_currentWord];
-            
-            var text = new FormattedText(word.Word,
-                CultureInfo.CurrentUICulture,
-                FlowDirection.LeftToRight,
-                CurrentTheme.Font,
-                GetFontSize(word.SizeValue),
-                new SolidColorBrush(word.Color),
-                DpiScale.PixelsPerDip);
+ 
+            _initScale = new Point(5, 5);
 
-            switch (_currentWord)
-            {
-                case 1:
-                    _nextTransform.X += 20;
-                    break;
-                case 2:
-
-                    _nextTransform.Y += 20;
-                    break;
-                case 3:
-
-                    _nextTransform.X -= 20;
-                    break;
-                case 4:
-                    _nextTransform.Y -= 20;
-                    break;
-            }
-
-
-            var geo = text.BuildGeometry(new Point(0, 0));
-            var scale = new ScaleTransform(_initScale.X, _initScale.Y);
-            var translate = new TranslateTransform(_nextTransform.X, _nextTransform.Y);
-
+            _minWordWeight = _words.Min(e => e.wordWeight);
+            _fontMultiplier = GetFontMultiplier();
 
             var dg = new DrawingGroup();
             using (var context = dg.Open())
             {
-                context.PushTransform(scale);
-                context.PushTransform(translate);
-                context.DrawGeometry(new SolidColorBrush(word.Color), null, geo);
+                context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, Width, Height));
             }
-            /*
-            using (var context = Groupie.Drawing.)
+
+            _mainDrawingGroup.Children.Add(dg);
+            
+            
+        }
+
+        public void AddWord()
+        {
+            var word = _words[_currentWord];
+
+            var geo = CreateWordGeometry(word);
+
+            if (geo != null)
             {
-                context.DrawDrawing(dg);
+                var dg = new DrawingGroup();
+                using (var context = dg.Open())
+                {
+                    context.DrawDrawing(geo);
+                }
+                _mainDrawingGroup.Children.Add(dg);
             }
-            _geoSize = geo.Bounds;
-*/
-            _initScale.X -= 5.0 / wordCount;
-            _initScale.Y -= 5.0 / wordCount;
-            Debug.WriteLine(Groupie.Height + "\t" + Groupie.Width);
+
+
             _currentWord++;
         }
+
+        public void DoStuff()
+        {
+            if (_currentWord == _words.Count )
+            {
+                PopulateWordList(DataContext as WordCloudData);
+                Setup();
+            }
+             AddWord();
+        }
+
+        private Point CalculateNextStartingPoint(double adjustment = 0.0)
+        {
+            _spiralPosition += adjustment;
+            if (_spiralPosition > WordCloudConstants.MaxSprialLength)
+            {
+                _spiralPosition = 0.0;
+            }
+
+            var spiralPoint = GetSpiralPoint(_spiralPosition);
+            
+            
+            //var center = GetCenterPoint();
+            //return new Point(spiralPoint.X + center.X, spiralPoint.Y + center.Y);
+            return new Point(spiralPoint.X + Width / 2, spiralPoint.Y + Height / 2);
+        }
+
+        private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
+        {
+            var text = new FormattedText(word.Word,
+                CultureInfo.CurrentUICulture,
+                FlowDirection.LeftToRight,
+                CurrentTheme.Font,
+                GetFontSize(word.wordWeight),
+                new SolidColorBrush(word.Color),
+                DpiScale.PixelsPerDip);
+            _spiralPosition = 0.0;
+
+            var position = new Point(Width/2 - text.Width / 2,Height/2 - text.Height / 2);
+            var geo = new GeometryDrawing();
+            geo.Brush = new SolidColorBrush(word.Color);
+            geo.Geometry = text.BuildGeometry(position);
+
+            var translateTransform = new TranslateTransform(0.0, 0.0);
+            var rotateTransform = new RotateTransform(word.Angle, position.X, position.Y);
+            var transformGroup = new TransformGroup();
+
+            transformGroup.Children.Add(rotateTransform);
+            transformGroup.Children.Add(translateTransform);
+
+            geo.Geometry.Transform = transformGroup;
+
+            bool collided;
+            var adjustment = 0.0;
+            do
+            {
+                var newPosition = CalculateNextStartingPoint(adjustment);
+                translateTransform.X = Width / 2 - newPosition.X;
+                translateTransform.Y = Height / 2 - newPosition.Y;
+                collided = WordGeometryHasCollision(geo);
+                adjustment = WordCloudConstants.DoublePi /30;
+            } while (collided);
+
+
+            geo.Freeze();
+
+            return geo;
+        }
+
+        private bool WordGeometryHasCollision(GeometryDrawing geo)
+        {
+            foreach (var dr in _mainDrawingGroup.Children.OfType<DrawingGroup>().SelectMany(dg => dg.Children.OfType<GeometryDrawing>()).Where(gd => gd.Geometry is GeometryGroup))
+            {
+                var intersectionDetail = geo.Geometry.FillContainsWithDetail(dr.Geometry);
+                if (intersectionDetail != IntersectionDetail.Empty && intersectionDetail != IntersectionDetail.NotCalculated) return true;
+            }
+
+            return false;
+        }
+        
 
         private void WordCloud2_OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (!(e.NewValue is WordCloudData wordCloudData)) return;
             PopulateWordList(wordCloudData);
-            DoStuff();
+            Setup();
+            for (var i = 0; i < _words.Count; i++)
+                AddWord();
         }
 
         private void PopulateWordList(WordCloudData wordCloudData)
         {
             var random = new Random();
-            foreach (var row in wordCloudData.Words.Rows)
+            foreach (var row in wordCloudData.Words.Rows.Take(MaxWords))
             {
                 var colorIndex = 0;
                 var angle = WordCloudConstants.NoRotation;
@@ -114,7 +190,7 @@ namespace WordCloudTest.Views
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
                     // First word always horizontal 70% Horizontal (default), 30% Vertical
-                    if (!_words.Any() && random.Next(0, 10) >= 7)
+                    if (_words.Any() && random.Next(0, 10) >= 7)
                     {
                         angle = WordCloudConstants.MixedRotationVertical;
                     }
@@ -124,7 +200,8 @@ namespace WordCloudTest.Views
                     // First word always horizontal
                     if (!_words.Any())
                     {
-                        angle = -WordCloudConstants.RandomMaxRotationAbs + random.Next(0, WordCloudConstants.RandomRange);
+                        angle = -WordCloudConstants.RandomMaxRotationAbs +
+                                random.Next(0, WordCloudConstants.RandomRange);
                     }
                 }
 
@@ -132,7 +209,7 @@ namespace WordCloudTest.Views
                 _words.Add(new WordCloudEntry
                     {
                         Word = row.Item.Word,
-                        SizeValue = row.Count * WordCloudConstants.WeightedFrequencyMultiplier,
+                        wordWeight = row.Count * WordCloudConstants.WeightedFrequencyMultiplier,
                         Color = CurrentTheme.ColorList[colorIndex],
                         AlphaValue = row.Count,
                         Angle = angle
@@ -141,19 +218,64 @@ namespace WordCloudTest.Views
             }
         }
 
-        private int GetFontSize(int size)
+        private Point GetCenterPoint()
         {
-            var minSize = _words.Min(e => e.SizeValue);
-            var maxSize = Math.Max(_words.Max(e => e.SizeValue), WordCloudConstants.MinimumLargestValue);
-            var wordSizeRange = Math.Max(0.00001, maxSize - minSize);
-            var areaPerLetter = GetAverageLetterPixelWidth() / wordSizeRange;
-            var targetWidth = (ActualWidth + ActualHeight) / WordCloudConstants.TargetWidthFactor * WordCloudConstants.LargestSizeWidthProportion;
-            var largestWord = _words.OrderByDescending(e => (e.SizeValue - minSize) * e.Word.Length).First();
+            var point = default(Point);
+            switch (_currentCenterPoint)
+            {
+                case CenterPoints.M:
+                    point = new Point((int) (Width / 2), (int) (Height / 2));
+                    break;
+                case CenterPoints.R:
+                    point = new Point((int) (Width / 4), (int) (Height / 4));
+                    break;
+                case CenterPoints.T:
+                    point = new Point((int) (Width / 4), (int) (3 * Height / 2));
+                    break;
+                case CenterPoints.L:
+                    point = new Point((int) (3 * Width / 4), (int) (Height / 2));
+                    break;
+                case CenterPoints.B:
+                    point = new Point((int) (3 * Width / 4), (int) (3 * Height / 4));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
 
-// Use minimum word length of MINIMUM_LARGEST_WORD_LENGTH to avoid overscalling
+/*
+            if (_currentCenterPoint == CenterPoints.B)
+            {
+                _currentCenterPoint = CenterPoints.M;
+            }
+            else
+            {
+                _currentCenterPoint = _currentCenterPoint + 1;
+            }
+*/
+
+            return point;
+        }
+
+        private Point GetSpiralPoint(double position)
+        {
+            var mult = position / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
+            var angle = position % WordCloudConstants.DoublePi;
+            return new Point(mult * Math.Sin(angle), mult * Math.Cos(angle));
+        }
+
+        private double GetFontMultiplier()
+        {
+            var maxWordWeight = Math.Max(_words.Max(e => e.wordWeight), WordCloudConstants.MinimumLargestValue);
+            var wordWeightRange = Math.Max(0.00001, maxWordWeight - _minWordWeight);
+            var areaPerLetter = GetAverageLetterPixelWidth() / wordWeightRange;
+
+            var targetWidth = (Width + Height) / WordCloudConstants.TargetWidthFactor * WordCloudConstants.LargestSizeWidthProportion;
+            var largestWord = _words.OrderByDescending(e => (e.wordWeight - _minWordWeight) * e.Word.Length).First();
+
+            // Use minimum word length of MINIMUM_LARGEST_WORD_LENGTH to avoid overscalling
             var largestWordLength = Math.Max(largestWord.Word.Length, WordCloudConstants.MinimumLargestWordLength);
 
-            var maxWordSize = 100 / ((largestWord.SizeValue - minSize) * largestWordLength * areaPerLetter / targetWidth);
+            var maxWordSize = 100 / ((largestWord.wordWeight - _minWordWeight) * largestWordLength * areaPerLetter / targetWidth);
 
             // Reduce the maximum word size for random theme to avoid placement/collision issues due to high angle values
             if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Random)
@@ -163,29 +285,34 @@ namespace WordCloudTest.Views
 
             var maxFontSize = Math.Max(WordCloudConstants.MinFontSize * 2.7, maxWordSize);
 
-            var fontMultiplier = (int) Math.Min((maxFontSize - WordCloudConstants.MinFontSize) / wordSizeRange, 200);
-            return (int) (((size - minSize) * fontMultiplier) + WordCloudConstants.MinFontSize);
+            return Math.Min((maxFontSize - WordCloudConstants.MinFontSize) / wordWeightRange, 200);
+        }
+
+        private int GetFontSize(int size)
+        {
+            return (int) ((size - _minWordWeight) * _fontMultiplier + WordCloudConstants.MinFontSize);
         }
 
         private double GetAverageLetterPixelWidth()
         {
-            double totalOfAverages = 0.0;
+            var txt = new FormattedText("X",
+                Thread.CurrentThread.CurrentCulture,
+                FlowDirection.LeftToRight,
+                CurrentTheme.Font,
+                WordCloudConstants.WeightedFrequencyMultiplier,
+                Brushes.Black,
+                DpiScale.PixelsPerDip);
 
-// Average the letter width over the top 10 (or total count if less) words
-            int wordCount = Math.Min(10, _words.Count);
-            foreach (var entry in _words)
-            {
-                var txt = new FormattedText(entry.Word,
-                    Thread.CurrentThread.CurrentCulture,
-                    FlowDirection.LeftToRight,
-                    CurrentTheme.Font,
-                    100,
-                    Brushes.Black,
-                    DpiScale.PixelsPerDip);
-                totalOfAverages += txt.Width / entry.Word.Length;
-            }
+            return txt.Width;
+        }
 
-            return (totalOfAverages / wordCount);
+        private enum CenterPoints
+        {
+            M,
+            R,
+            T,
+            L,
+            B
         }
     }
 }

@@ -77,7 +77,7 @@ namespace WordCloudTest
                 }
                 return _wordCloudEntries;
             }
-            set { _wordCloudEntries = value.OrderByDescending(e => e.SizeValue).Take(Const.MaxWords).ToList(); }
+            set { _wordCloudEntries = value.OrderByDescending(e => e.wordWeight).Take(Const.MaxWords).ToList(); }
         }
 
         public int BitmapHeight
@@ -266,9 +266,9 @@ namespace WordCloudTest
             double maxAlphaValue = WordCloudEntries.Max(e => e.AlphaValue);
             double alphaValueRange = Math.Max(0, maxAlphaValue - minAlphaValue);
 
-            double minSize = WordCloudEntries.Min(e => e.SizeValue);
+            double minSize = WordCloudEntries.Min(e => e.wordWeight);
 
-            double maxSize = Math.Max(WordCloudEntries.Max(e => e.SizeValue), Const.MinimumLargestValue);
+            double maxSize = Math.Max(WordCloudEntries.Max(e => e.wordWeight), Const.MinimumLargestValue);
             double wordSizeRange = Math.Max(0.00001, maxSize - minSize);
 
             var areaPerLetter = GetAverageLetterPixelWidth() / wordSizeRange;
@@ -277,13 +277,13 @@ namespace WordCloudTest
                                  Const.LargestSizeWidthProportion;
 
             WordCloudEntry largestWord = WordCloudEntries
-                .OrderByDescending(e => (e.SizeValue - minSize) * e.Word.Length)
+                .OrderByDescending(e => (e.wordWeight - minSize) * e.Word.Length)
                 .First();
 
             // Use minimum word length of MINIMUM_LARGEST_WORD_LENGTH to avoid overscalling
             int largestWordLength = Math.Max(largestWord.Word.Length, Const.MinimumLargestWordLength);
 
-            double maxWordSize = 100 / (((largestWord.SizeValue - minSize) * largestWordLength * areaPerLetter) /
+            double maxWordSize = 100 / (((largestWord.wordWeight - minSize) * largestWordLength * areaPerLetter) /
                                         targetWidth);
 
             // Reduce the maximum word size for random theme to avoid placement/collision issues due to high angle values
@@ -320,7 +320,7 @@ namespace WordCloudTest
                 Color wordColor = GetWordColor((cloudEntry.AlphaValue - minAlphaValue) / alphaValueRange,
                     cloudEntry.Color);
 
-                double fontSize = ((cloudEntry.SizeValue - minSize) * fontMultiplier) + Const.MinFontSize;
+                double fontSize = ((cloudEntry.wordWeight - minSize) * fontMultiplier) + Const.MinFontSize;
                 fontSize /= _pixelsPerDip; //scale for high DPI
 
                 // Create a bitmap for the word by giving its text, font size, color and angle
@@ -1059,7 +1059,7 @@ namespace WordCloudTest
             return new WordCloudEntry
             {
                 Word = word,
-                SizeValue = wordSize * Const.WeightedFrequencyMultiplier,
+                wordWeight = wordSize * Const.WeightedFrequencyMultiplier,
                 Color = CurrentTheme.ColorList[colorIndex],
                 AlphaValue = wordSize,
                 Angle = angle
