@@ -8,6 +8,7 @@
         Title="MainWindow" Height="600" Width="600" BorderThickness="0">
     <StackPanel>
         <local:WordCloud2 DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="500" Width="500"></local:WordCloud2>
+        <Button Click="AddWord" Content="add"></Button>
         <Button Click="DoWordCloud" Content="do"></Button>
     </StackPanel>
 </Window>

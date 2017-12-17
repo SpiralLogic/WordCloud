@@ -61,7 +61,7 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Length to travel along the spiral before ending search
         /// </summary>
-        public const double MaxSprialLength = DoublePi * 580;
+        public const double MaxSprialLength = DoublePi * 5800;
 
         /// <summary>
         /// The fixed limit of top words for WordCloud
