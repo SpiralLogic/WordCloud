@@ -18,7 +18,7 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2 : UserControl
     {
-        private const int MaxWords = 100;
+        private const int MaxWords = 200;
         private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
         private readonly Dictionary<GeometryDrawing, Rect> _geoBoundsLookup = new Dictionary<GeometryDrawing, Rect>();
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
@@ -31,7 +31,7 @@ namespace WordCloudTest.Views
         private int _minWordWeight;
         private readonly DrawingGroup _mainDrawingGroup;
         private GeometryDrawing _previousCollidedWord;
-        private BoundsQuadTree<GeometryDrawing> _boundsQuadTree;
+        private RectQuadTree<GeometryDrawing> _pointQuadTree;
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
 
         public WordCloud2()
@@ -50,7 +50,7 @@ namespace WordCloudTest.Views
         {
             _minWordWeight = _words.Min(e => e.wordWeight);
             _fontMultiplier = GetFontMultiplier();
-            _boundsQuadTree = new BoundsQuadTree<GeometryDrawing>(new Rect(0, 0, Width, Height), 6);
+            _pointQuadTree = new RectQuadTree<GeometryDrawing>(new Rect(0, 0, Width, Height));
 
             var bgDrawingGroup = new DrawingGroup();
             _wordDrawingGroup = new DrawingGroup();
@@ -59,7 +59,7 @@ namespace WordCloudTest.Views
             {
                 context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, Width, Height));
             }
-            
+
             bgDrawingGroup.Freeze();
 
             _mainDrawingGroup.Children.Add(bgDrawingGroup);
@@ -83,7 +83,12 @@ namespace WordCloudTest.Views
         {
             foreach (var word in _words)
             {
-                _wordDrawingGroup.Children.Add(CreateWordGeometry(word));
+                var geo = CreateWordGeometry(word);
+
+                if (geo != null)
+                {
+                    _wordDrawingGroup.Children.Add(geo);
+                }
             }
 
             _currentWord = 0;
@@ -107,7 +112,8 @@ namespace WordCloudTest.Views
 
         public void RestartCloud(WordCloudData wordCloudData)
         {
-            var s = new Stopwatch();s.Start();
+            var s = new Stopwatch();
+            s.Start();
             PopulateWordList(wordCloudData);
             Setup();
             AddWords();
@@ -118,17 +124,18 @@ namespace WordCloudTest.Views
 
         private Point CalculateNextStartingPoint(double adjustment = 0.0)
         {
+            var center = new Point();
             if (adjustment > WordCloudConstants.MaxSprialLength)
             {
-                adjustment = 0.0;
+                adjustment = 2.0;
+                center = GetCenterPoint();
             }
 
             var mult = adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
             var angle = adjustment % WordCloudConstants.DoublePi;
-
-            //var center = GetCenterPoint();
-            //return new Point(spiralPoint.X + center.X, spiralPoint.Y + center.Y);
-            return new Point(Width / 2 + mult * Math.Sin(angle), Height / 2 + mult * Math.Cos(angle));
+            var spiralPoint = new Point(Width / 2 + mult * Math.Sin(angle), Height / 2 + mult * Math.Cos(angle));
+            //return new Point(Width / 2 + mult * Math.Sin(angle), Height / 2 + mult * Math.Cos(angle));
+            return new Point(spiralPoint.X + center.X, spiralPoint.Y + center.Y);
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -136,7 +143,7 @@ namespace WordCloudTest.Views
             var text = new FormattedText(word.Word,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
-                CurrentTheme.Font,
+                CurrentTheme.Typeface,
                 GetFontSize(word.wordWeight),
                 new SolidColorBrush(word.Color),
                 DpiScale.PixelsPerDip);
@@ -146,7 +153,7 @@ namespace WordCloudTest.Views
             geo.Brush = new SolidColorBrush(word.Color);
             geo.Geometry = text.BuildGeometry(initialPoint);
             var bounds = geo.Bounds;
-             
+
             var drawPoint = new Point(Width / 2, Height / 2);
 
             var rotateTransform = new RotateTransform(word.Angle, drawPoint.X, drawPoint.Y);
@@ -170,17 +177,16 @@ namespace WordCloudTest.Views
 
             var translateTransform = new TranslateTransform(0.0, 0.0);
             transformGroup.Children.Add(translateTransform);
-            
+
             while (PerformCollisionTests(geo, bounds, ref adjustment))
             {
                 var nextPosition = CalculateNextStartingPoint(adjustment);
 
                 bounds.X = nextPosition.X - halfGeoWidth;
                 bounds.Y = nextPosition.Y - halfGeoHeight;
-               
+
                 translateTransform.X = bounds.X - initialPoint.X;
                 translateTransform.Y = bounds.Y - initialPoint.Y;
- 
             }
 
 
@@ -188,7 +194,7 @@ namespace WordCloudTest.Views
             _previousCollidedWord = null;
             geo.Freeze();
             _geoBoundsLookup.Add(geo, bounds);
-            _boundsQuadTree.Insert(geo, bounds);
+            _pointQuadTree.Insert(geo, bounds);
 
             return geo;
         }
@@ -211,6 +217,14 @@ namespace WordCloudTest.Views
         private bool DoGeometricDrawingsCollide(GeometryDrawing geo, GeometryDrawing dr, Rect bounds, ref double adjustment)
         {
             if (Equals(geo, dr)) return false;
+
+            //TODO: Start from new place
+            if (bounds.X < 0 || bounds.Y < 0 || bounds.Right > Width || bounds.Top > Height)
+            {
+                _previousCollidedWord = null;
+                adjustment += Math.Min(bounds.Width, bounds.Height) * .1;
+                return true;
+            }
 
             if (!_geoBoundsLookup[dr].Contains(bounds) && !_geoBoundsLookup[dr].IntersectsWith(bounds))
             {
@@ -274,7 +288,7 @@ namespace WordCloudTest.Views
 
         private Point GetCenterPoint()
         {
-            var point = default(Point);
+            Point point;
             switch (_currentCenterPoint)
             {
                 case CenterPoints.M:
@@ -296,7 +310,6 @@ namespace WordCloudTest.Views
                     throw new ArgumentOutOfRangeException();
             }
 
-/*
             if (_currentCenterPoint == CenterPoints.B)
             {
                 _currentCenterPoint = CenterPoints.M;
@@ -305,7 +318,6 @@ namespace WordCloudTest.Views
             {
                 _currentCenterPoint = _currentCenterPoint + 1;
             }
-*/
 
             return point;
         }
@@ -346,7 +358,7 @@ namespace WordCloudTest.Views
             var txt = new FormattedText("X",
                 Thread.CurrentThread.CurrentCulture,
                 FlowDirection.LeftToRight,
-                CurrentTheme.Font,
+                CurrentTheme.Typeface,
                 WordCloudConstants.WeightedFrequencyMultiplier,
                 Brushes.Black,
                 DpiScale.PixelsPerDip);

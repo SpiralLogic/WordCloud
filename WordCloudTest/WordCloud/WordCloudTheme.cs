@@ -9,9 +9,9 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Initializes a new instance of the <see cref="WordCloudTheme"/> class.
         /// </summary>
-        public WordCloudTheme(Typeface typeFace,FontWeight fontWeight, WordCloudThemeWordRotation wordRotation, List<Color> colorList, Color backgroundColor)
+        public WordCloudTheme(Typeface typeFace, FontWeight fontWeight, WordCloudThemeWordRotation wordRotation, List<Color> colorList, Color backgroundColor)
         {
-            Font = typeFace;
+            Typeface = typeFace;
             WordRotation = wordRotation;
             ColorList = colorList;
             BackgroundColor = backgroundColor;
@@ -23,7 +23,7 @@ namespace WordCloudTest.WordClouds
         /// <value>
         /// The font.
         /// </value>
-        public Typeface Font
+        public Typeface Typeface
         {
             get;
             set;

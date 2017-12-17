@@ -58,8 +58,8 @@ namespace WordCloudTest
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 58},
-            {"windows", 52},
+            {"coding", 200},
+            {"windows", 100},
             {"wawa", 48},
             {"mac", 42},
             {"use", 41},
@@ -257,7 +257,7 @@ namespace WordCloudTest
             {"downloading2", 4},
             {"enough2", 4},
             {"etc2", 4},
-                        {"coding3", 58},
+                        {"coding3", 500},
             {"windows3", 52},
             {"wawa3", 48},
             {"mac3", 42},
