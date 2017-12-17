@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace WordCloudTest.Properties {
+namespace wordcloud_test.Properties {
     using System;
     
     
