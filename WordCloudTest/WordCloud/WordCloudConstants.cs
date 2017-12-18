@@ -25,7 +25,7 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Minimum font size
         /// </summary>
-        public const int MinFontSize = 11;
+        public const int MinFontSize = 15;
 
         /// <summary>
         /// Minimum largest value

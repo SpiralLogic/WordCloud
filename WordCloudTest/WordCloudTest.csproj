@@ -58,6 +58,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="BoundingBox\HierarchicalBoundingBox.cs" />
     <Compile Include="QuadTree\QuadTree.cs" />
     <Compile Include="test.cs" />
     <Compile Include="WordCloud\WordCloudThemes.cs" />

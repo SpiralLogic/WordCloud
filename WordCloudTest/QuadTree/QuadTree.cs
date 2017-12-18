@@ -12,17 +12,16 @@ namespace WordCloudTest.QuadTree
         protected const int BottomRight = 2;
         protected const int BottomLeft = 3;
 
-        protected Rect _boundary;
-        protected int _depth;
-        protected readonly IDictionary<T, TK> _items = new Dictionary<T, TK>();
-        protected QuadTreeBase<TK, T>[] _nodes;
+        protected Rect Boundary;
+        protected int Depth;
+        protected readonly IDictionary<T, TK> Items = new Dictionary<T, TK>();
+        protected QuadTreeBase<TK, T>[] Nodes;
 
         protected QuadTreeBase(Rect boundingBox, int depth = 5)
         {
-            _depth = depth;
-            _boundary = boundingBox;
+            Depth = depth;
+            Boundary = boundingBox;
         }
-
 
         public virtual bool Insert(T item, TK itemLocation)
         {
@@ -32,14 +31,14 @@ namespace WordCloudTest.QuadTree
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
-            if (_nodes != null)
+            if (Nodes != null)
             {
                 return GetNode(itemLocation)?.Insert(item, itemLocation) ?? false;
             }
 
-            _items.Add(item, itemLocation);
+            Items.Add(item, itemLocation);
 
-            if (_items.Count < MaxItemsPerNode || _depth == 0) return true;
+            if (Items.Count < MaxItemsPerNode || Depth == 0) return true;
 
             Divide();
 
@@ -48,7 +47,7 @@ namespace WordCloudTest.QuadTree
 
         public virtual IEnumerable<T> QueryLocation(TK range)
         {
-            var itemList = new List<T>(_items.Count);
+            var itemList = new List<T>(Items.Count);
             AddNodeQueryRanges(range, itemList);
 
             return itemList;
@@ -56,11 +55,11 @@ namespace WordCloudTest.QuadTree
 
         protected virtual void AddNodeQueryRanges(TK location, List<T> currentList)
         {
-            if (_depth == 0 || !IsInRange(location)) return;
+            if (Depth == 0 || !IsInRange(location)) return;
 
-            currentList.AddRange(_items.Keys);
+            currentList.AddRange(Items.Keys);
 
-            if (_nodes != null)
+            if (Nodes != null)
             {
                 GetNode(location)?.AddNodeQueryRanges(location, currentList);
             }
@@ -68,31 +67,31 @@ namespace WordCloudTest.QuadTree
 
         protected QuadTreeBase<TK, T> GetNode(TK location)
         {
-            if (_nodes[TopLeft].IsInRange(location)) return _nodes[TopLeft];
-            if (_nodes[TopRight].IsInRange(location)) return _nodes[TopRight];
-            if (_nodes[BottomRight].IsInRange(location)) return _nodes[BottomRight];
-            if (_nodes[BottomLeft].IsInRange(location)) return _nodes[BottomLeft];
+            if (Nodes[TopLeft].IsInRange(location)) return Nodes[TopLeft];
+            if (Nodes[TopRight].IsInRange(location)) return Nodes[TopRight];
+            if (Nodes[BottomRight].IsInRange(location)) return Nodes[BottomRight];
+            if (Nodes[BottomLeft].IsInRange(location)) return Nodes[BottomLeft];
 
             return null;
         }
-
+        
         protected void Divide()
         {
-            var boundarySize = new Size(_boundary.Width / 2, _boundary.Height / 2);
+            var boundarySize = new Size(Boundary.Width / 2, Boundary.Height / 2);
 
-            _nodes = new QuadTreeBase<TK, T>[4];
+            Nodes = new QuadTreeBase<TK, T>[4];
 
-            _nodes[TopLeft] = new QuadTreeBase<TK, T>(new Rect(_boundary.TopLeft, boundarySize), _depth - 1);
-            _nodes[TopRight] = new QuadTreeBase<TK, T>(new Rect(new Point(_boundary.Left + boundarySize.Width, _boundary.Top), boundarySize), _depth - 1);
-            _nodes[BottomRight] = new QuadTreeBase<TK, T>(new Rect(new Point(_boundary.Left + boundarySize.Width, _boundary.Top + boundarySize.Height), boundarySize), _depth - 1);
-            _nodes[BottomLeft] = new QuadTreeBase<TK, T>(new Rect(new Point(_boundary.Left, _boundary.Top + boundarySize.Height), boundarySize), _depth - 1);
+            Nodes[TopLeft] = new QuadTreeBase<TK, T>(new Rect(Boundary.TopLeft, boundarySize), Depth - 1);
+            Nodes[TopRight] = new QuadTreeBase<TK, T>(new Rect(new Point(Boundary.Left + boundarySize.Width, Boundary.Top), boundarySize), Depth - 1);
+            Nodes[BottomRight] = new QuadTreeBase<TK, T>(new Rect(new Point(Boundary.Left + boundarySize.Width, Boundary.Top + boundarySize.Height), boundarySize), Depth - 1);
+            Nodes[BottomLeft] = new QuadTreeBase<TK, T>(new Rect(new Point(Boundary.Left, Boundary.Top + boundarySize.Height), boundarySize), Depth - 1);
 
-            foreach (var kvp in _items)
+            foreach (var kvp in Items)
             {
                 Insert(kvp.Key, kvp.Value);
             }
 
-            _items.Clear();
+            Items.Clear();
         }
 
         protected virtual bool IsInRange(TK location)
@@ -109,7 +108,7 @@ namespace WordCloudTest.QuadTree
 
         protected override bool IsInRange(Point location)
         {
-            return _boundary.Contains(location);
+            return Boundary.Contains(location);
         }
     }
 
@@ -126,10 +125,10 @@ namespace WordCloudTest.QuadTree
             if (item == null)
                 throw new ArgumentNullException(nameof(item));
 
-            if (!_boundary.Contains(itemLocation))
+            if (!Boundary.Contains(itemLocation))
                 return false;
 
-            if (_nodes != null)
+            if (Nodes != null)
             {
                 var node = GetNode(itemLocation);
 
@@ -143,9 +142,9 @@ namespace WordCloudTest.QuadTree
                 return node.Insert(item, itemLocation);
             }
 
-            _items.Add(item, itemLocation);
+            Items.Add(item, itemLocation);
 
-            if (_items.Count < MaxItemsPerNode || _depth == 0) return true;
+            if (Items.Count < MaxItemsPerNode || Depth == 0) return true;
 
             Divide();
 
@@ -154,7 +153,7 @@ namespace WordCloudTest.QuadTree
 
         public override IEnumerable<T> QueryLocation(Rect range)
         {
-            var itemList = new List<T>(_items.Count + _borderItems.Count);
+            var itemList = new List<T>(Items.Count + _borderItems.Count);
             AddNodeQueryRanges(range, itemList);
 
             return itemList;
@@ -162,7 +161,7 @@ namespace WordCloudTest.QuadTree
 
         protected override bool IsInRange(Rect location)
         {
-            return _boundary.Contains(location);
+            return Boundary.Contains(location);
         }
     }
 }
