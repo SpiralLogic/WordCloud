@@ -1,141 +1,190 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
 using System.Windows;
+using System.Linq;
+
+using System.Windows.Media;
 
 namespace WordCloudTest.BoundingBox
 {
-    class HierarchicalBoundingBox
+    class HierarchicalBoundingBox<T> where T : Geometry
     {
-        private Rect _bounds;
-        private readonly int _numberOfNodes;
-        private readonly int _nodesVertical;
-        private readonly int _nodesHorizontal;
-        private Size _nodeSize;
-        private HierarchicalBoundingBox[] _nodes;
-        private bool _isHit;
-        private IList<Rect> _hitCache;
+        private const double MinimumNodeSize = 16;
+        private const int LeafExpansion = 2;
+        protected const int TopLeft = 0;
+        protected const int TopRight = 1;
+        protected const int BottomRight = 2;
+        protected const int BottomLeft = 3;
 
-        private HierarchicalBoundingBox(Rect bounds, int numberOfNodes = 4)
+        private Rect _localBounds;
+        private Rect _globalBounds;
+        private readonly T _geo;
+        private readonly double _size;
+        private HierarchicalBoundingBox<T>[] _regions;
+        private bool _isHit;
+
+        public Rect GlobalBounds
         {
-            _bounds = bounds;
-            _numberOfNodes = numberOfNodes;
-            _nodesVertical = numberOfNodes / 2;
-            _nodesHorizontal = numberOfNodes / 2;
+            get => new Rect(new Point(_globalBounds.X + _localBounds.X, _globalBounds.Y + _localBounds.Y), _localBounds.Size);
+            set
+            {
+                _globalBounds = value;
+                if (_regions != null)
+                    foreach (var node in _regions)
+                        node.GlobalBounds = value;
+            }
+
+    }
+
+        public HierarchicalBoundingBox(T geo, Rect localBounds, Rect globalBounds)
+        {
+            _localBounds = localBounds;
+
+            var size = _localBounds.Size.Width * _localBounds.Size.Height;
+            if (size < MinimumNodeSize)
+            {
+                _localBounds.Width += LeafExpansion;
+                _localBounds.Height += LeafExpansion;
+            }
+
+            _globalBounds = globalBounds;
+            _geo = geo;
+            _size = _localBounds.Size.Width * _localBounds.Size.Height;
         }
 
-        public HierarchicalBoundingBox(Rect bounds)
+        public bool IsRegionHit(Rect globalTestRegion, DrawingGroup dg = null)
         {
-            _bounds = new Rect(new Size(bounds.Width, bounds.Height));
-            if (_bounds.Height > _bounds.Width)
+            if (_isHit) return _isHit;
+
+            if (_regions == null)
             {
-                _numberOfNodes = 2 * (int) Math.Ceiling(_bounds.Height / _bounds.Width);
-                _nodesVertical = _numberOfNodes / 2;
-                _nodesHorizontal = 2;
+                Divide();
+            }
+
+            if (_regions == null)
+            {
+                var testRectangle = new RectangleGeometry(GlobalBounds);
+
+                var result = Geometry.Combine(testRectangle, _geo, GeometryCombineMode.Exclude, null, .0001, ToleranceType.Relative);
+                if (dg != null)
+                {
+                    using (var c = dg.Append())
+                    {
+                        c.DrawGeometry(null, new Pen(Brushes.DeepPink, 0.5), testRectangle);
+                    }
+                }
+
+                _isHit = !result.IsEmpty();
+
+                return _isHit;
+            }
+
+            foreach (var node in _regions)
+            {
+                if (node.IsRegionHit(globalTestRegion, dg))
+                    return true;
+            }
+
+            return false;
+        }
+
+        public List<HierarchicalBoundingBox<T>> GetLeafNodesInRegion(Rect globalRegion)
+        {
+            var localRegion = new Rect(new Point(_globalBounds.X - globalRegion.X, _globalBounds.Y - globalRegion.Y), globalRegion.Size);
+
+
+            var newList = new List<HierarchicalBoundingBox<T>>();
+            GetLeafNodesInternal(localRegion, newList);
+
+            return newList;
+        }
+
+        private void GetLeafNodesInternal(Rect localRegion, List<HierarchicalBoundingBox<T>> newList)
+        {
+            if (!localRegion.Contains(_localBounds) || !localRegion.IntersectsWith(_localBounds)) return;
+
+            Divide();
+
+            if (_regions == null)
+            {
+                newList.Add(this);
+                return;
+            }
+
+            foreach (var node in _regions)
+            {
+                node.GetLeafNodesInternal(localRegion, newList);
+            }
+        }
+
+        public void Divide()
+        {
+            if (_regions != null) return;
+
+            var nodeSize = new Size(_localBounds.Width / 2, _localBounds.Height / 2);
+            bool half = false;
+            if (nodeSize.Width < MinimumNodeSize / 4 && nodeSize.Height < MinimumNodeSize / 4) return;
+            if (nodeSize.Width < MinimumNodeSize / 4)
+            {
+
+                nodeSize.Height = nodeSize.Height / 2;
             }
             else
             {
-                _numberOfNodes = 2 * (int) Math.Ceiling(_bounds.Width / _bounds.Height);
-                _nodesHorizontal = _numberOfNodes / 2;
-                _nodesVertical = 2;
+                half = true;
+
+                nodeSize.Width /= 2;
             }
+
+            _regions = new HierarchicalBoundingBox<T>[half?2:4];
+
+            _regions[TopLeft] = new HierarchicalBoundingBox<T>(_geo, new Rect(_localBounds.TopLeft, nodeSize), _globalBounds);
+            _regions[TopRight] = new HierarchicalBoundingBox<T>(_geo, new Rect(new Point(_localBounds.Left + nodeSize.Width, _localBounds.Top), nodeSize), _globalBounds);
+            if(!half) _regions[BottomRight] = new HierarchicalBoundingBox<T>(_geo, new Rect(new Point(_localBounds.Left + nodeSize.Width, _localBounds.Top - nodeSize.Height), nodeSize), _globalBounds);
+            if (!half) _regions[BottomLeft] = new HierarchicalBoundingBox<T>(_geo, new Rect(new Point(_localBounds.Left, _localBounds.Top + nodeSize.Height), nodeSize), _globalBounds);
         }
 
-        public void Divide(Predicate<Rect> hitTest, int iterations = 1)
-        {
-            _isHit = hitTest(_bounds);
-            if (iterations == 0 || !_isHit) return;
-            var nodeSize = new Size(_bounds.Width / _nodesHorizontal, _bounds.Height / _nodesVertical);
-            if (nodeSize.Width < 2 || nodeSize.Height < 2) return;
-            
-            _nodes = new HierarchicalBoundingBox[_numberOfNodes];
+        private static DrawingGroup _bbdg = new DrawingGroup();
 
-            for (var i = 0; i < _nodesVertical; ++i)
+        public bool DoBoxesCollide(HierarchicalBoundingBox<T> toTestBoundingBox, DrawingGroup dg)
+        {
+            var testRegion = Rect.Intersect(GlobalBounds, toTestBoundingBox.GlobalBounds);
+            Debug.WriteLine(toTestBoundingBox.GlobalBounds);
+            Debug.WriteLine(testRegion);
+            var remoteNodes = toTestBoundingBox.GetLeafNodesInRegion(testRegion);
+
+            if (_bbdg != null)
             {
-                for (var j = 0; j < _nodesHorizontal; ++j)
+                using (var c = _bbdg.Open())
                 {
-                    var boundingBox = new Rect(new Point(_bounds.X + j * nodeSize.Width, _bounds.Y + i * nodeSize.Height), nodeSize);
-                    _nodes[i * _nodesHorizontal + j] = new HierarchicalBoundingBox(boundingBox, 4);
-                    _nodes[i * _nodesHorizontal + j].Divide(hitTest, iterations - 1);
+                    var localNodes = GetLeafNodesInRegion(testRegion);
+
+                    foreach (var n in localNodes)
+                    {
+                        c.DrawRectangle(null, new Pen(Brushes.Black, 1), n.GlobalBounds);
+
+                    }
+                    foreach (var m in remoteNodes)
+                    {
+                        c.DrawRectangle(null, new Pen(Brushes.Blue, 0.5), m.GlobalBounds);
+
+                    }
+
+                    c.DrawRectangle(null, new Pen(Brushes.OrangeRed, 0.5), testRegion);
+                    c.DrawRectangle(null, new Pen(Brushes.DarkTurquoise, 0.5), GlobalBounds);
+                    c.DrawRectangle(null, new Pen(Brushes.Sienna, 0.5), toTestBoundingBox.GlobalBounds);
+
                 }
+                if (!dg.Children.Contains(_bbdg)) dg.Children.Add(_bbdg);
             }
-        }
 
-        public IEnumerable<Rect> GetBoxesHit(Rect inter)
-        {
-            if (_hitCache != null) return _hitCache;
-            
-            inter.X = 0;
-            inter.Y = 0;
-            inter.Width = _bounds.Width;
-            inter.Height= _bounds.Height;
 
-             _hitCache = new List<Rect>();
-            GetBoxesHitAdd(_hitCache, inter);
-            
-            return _hitCache;
-        }
 
-        private void GetBoxesHitAdd(IList<Rect> boxList, Rect inter)
-        {
-            if (!_isHit && !_bounds.Contains(inter) && !_bounds.IntersectsWith(inter)) return;
-            
-            if (_nodes != null && _nodes.Any())
+            foreach (var remoteNode in remoteNodes)
             {
-                foreach (var node in _nodes)
-                {
-                    node.GetBoxesHitAdd(boxList, inter);
-                }
-                
-                return;
+                if (IsRegionHit(remoteNode.GlobalBounds, _bbdg) && remoteNode.IsRegionHit(remoteNode.GlobalBounds)) return true;
             }
-            if (_nodes == null && _isHit)
-            {
-                boxList.Add(_bounds);
-            }
-        }
 
-        public IEnumerable<Rect> GetBoxesMissed()
-        {
-            var boxes = new List<Rect>();
-            GetBoxesMissedAdd(boxes);
-            return boxes;
-        }
-
-        private void GetBoxesMissedAdd(IList<Rect> boxList)
-        {
-            if (_nodes != null && _nodes.Any())
-            {
-                foreach (var node in _nodes)
-                {
-                    node.GetBoxesMissedAdd(boxList);
-                }
-                return;
-            }
-            if (_nodes == null && !_isHit)
-            {
-                boxList.Add(_bounds);
-            }
-        }
-
-        public bool IsHit(Point startPoint1, Point startPoint2, HierarchicalBoundingBox toTest)
-        {
-            if (_nodes == null && !_bounds.Contains(startPoint2)) return false;
-            var inter = new Rect(startPoint1, _bounds.Size);
-
-            inter.Intersect(new Rect(startPoint2, toTest._bounds.Size));
-
-            foreach (var s in GetBoxesHit(inter))
-            {
-                var ownBounds = new Rect(new Point(s.X + startPoint1.X, s.Y + startPoint1.Y), s.Size);
-
-                foreach (var t in toTest.GetBoxesHit(inter))
-                {
-                    var toTextBounds = new Rect(new Point(t.X + startPoint2.X, t.Y + startPoint2.Y), t.Size);
-
-                    if (ownBounds.Contains(toTextBounds) || ownBounds.IntersectsWith(toTextBounds)) return true;
-                }
-            }
             return false;
         }
     }
