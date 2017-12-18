@@ -59,7 +59,9 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="BoundingBox\HierarchicalBoundingBox.cs" />
-    <Compile Include="QuadTree\QuadTree.cs" />
+    <Compile Include="QuadTree\PointQuadTree.cs" />
+    <Compile Include="QuadTree\QuadTreeBase.cs" />
+    <Compile Include="QuadTree\RectQuadTree.cs" />
     <Compile Include="test.cs" />
     <Compile Include="WordCloud\WordCloudThemes.cs" />
     <Compile Include="WordFrequencyQuery\FrequencyTable.cs" />

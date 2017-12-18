@@ -18,7 +18,7 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2
     {
-        private const int MaxWords = 10;
+        private const int MaxWords = 50;
         private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
         private readonly Dictionary<Geometry, Rect> _geoBoundsLookup = new Dictionary<Geometry, Rect>();
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
@@ -30,7 +30,7 @@ namespace WordCloudTest.Views
         private int _minWordWeight;
         private readonly DrawingGroup _mainDrawingGroup;
         private Geometry _previousCollidedWord;
-        private RectQuadTree<Geometry> _pointQuadTree;
+        private RectQuadTree<Geometry> _recQuadTree;
         private readonly Dictionary<Geometry, HierarchicalBoundingBox<Geometry>> _wordChops = new Dictionary<Geometry, HierarchicalBoundingBox<Geometry>>();
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
 
@@ -50,7 +50,7 @@ namespace WordCloudTest.Views
         {
             _minWordWeight = _words.Min(e => e.wordWeight);
             _fontMultiplier = GetFontMultiplier();
-            _pointQuadTree = new RectQuadTree<Geometry>(new Rect(0, 0, Width, Height));
+            _recQuadTree = new RectQuadTree<Geometry>(new Rect(0, 0, Width, Height));
 
             var bgDrawingGroup = new DrawingGroup();
             _wordDrawingGroup = new DrawingGroup();
@@ -119,14 +119,14 @@ namespace WordCloudTest.Views
 
         public void RestartCloud(WordCloudData wordCloudData)
         {
-            if (_pointQuadTree != null)
+            if (_recQuadTree != null)
             {
                 _mainDrawingGroup.Children.Clear();
                 _geoBoundsLookup.Clear();
                 _wordChops.Clear();
                 _wordDrawingGroup.Children.Clear();
 
-                _pointQuadTree = null;
+                _recQuadTree = null;
                 _previousCollidedWord = null;
 
                 GC.Collect();
@@ -159,7 +159,8 @@ namespace WordCloudTest.Views
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
         {
-            var text = new FormattedText(word.Word,
+            HierarchicalBoundingBox<Geometry>.Bbdg.Children.Clear();
+                var text = new FormattedText(word.Word,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
                 CurrentTheme.Typeface,
@@ -175,16 +176,12 @@ namespace WordCloudTest.Views
             transformGroup.Children.Add(translateTransform);
             transformGroup.Children.Add(rotateTransform);
 
-            var bounds = textGeometry.Bounds;
-
-            Debug.WriteLine(textGeometry.Bounds);
-            Debug.WriteLine(bounds);
 
             textGeometry.Transform = transformGroup;
             Debug.WriteLine(textGeometry.Bounds);
-            Debug.WriteLine(bounds);
 
-            bounds = textGeometry.Bounds;
+            var bounds = textGeometry.Bounds;
+            Debug.WriteLine(bounds);
 
             ChopWord(textGeometry, bounds);
 
@@ -197,7 +194,7 @@ namespace WordCloudTest.Views
 
             var collide = new Stopwatch();
             collide.Start();
-
+            var count=0;
             while (PerformCollisionTests(textGeometry, bounds, ref adjustment))
             {
                 var nextPosition = CalculateNextStartingPoint(adjustment);
@@ -207,27 +204,32 @@ namespace WordCloudTest.Views
 
                 translateTransform.X = bounds.X - initialPoint.X;
                 translateTransform.Y = bounds.Y - initialPoint.Y;
+                count++;
             }
-
+            Debug.WriteLine("shuiffled " + count);
             var geo = new GeometryDrawing
             {
                 Geometry = textGeometry,
                 Brush = new SolidColorBrush(word.Color)
             };
 
-            Debug.WriteLine(textGeometry.Bounds);
-            Debug.WriteLine(bounds);
+
 
             collide.Stop();
             _previousCollidedWord = null;
             geo.Freeze();
+            Debug.WriteLine(textGeometry.Bounds);
+            Debug.WriteLine(geo.Bounds);
+            Debug.WriteLine(bounds);
             _geoBoundsLookup.Add(textGeometry, bounds);
-            _pointQuadTree.Insert(textGeometry, bounds);
+            _recQuadTree.Insert(textGeometry, bounds);
+            _wordGeoLookup.Add(textGeometry, word);
 
             return geo;
         }
 
         Stopwatch t = new Stopwatch();
+        private Dictionary<Geometry,WordCloudEntry> _wordGeoLookup = new Dictionary<Geometry, WordCloudEntry>();
 
         private void ChopWord(Geometry geo, Rect bounds)
         {
@@ -241,7 +243,8 @@ namespace WordCloudTest.Views
                 if (DoGeometricDrawingsCollide(newGeometry, _previousCollidedWord, bounds, ref adjustment)) return true;
             }
 
-            foreach (var existingGeometry in _pointQuadTree.QueryLocation(bounds))
+            Debug.WriteLine(_recQuadTree.QueryLocation(bounds).Count());
+            foreach (var existingGeometry in _geoBoundsLookup.Keys)
             {
                 if (DoGeometricDrawingsCollide(newGeometry, existingGeometry, bounds, ref adjustment)) return true;
             }
@@ -270,6 +273,7 @@ namespace WordCloudTest.Views
             var bbTest = _wordChops[existingGeo].DoBoxesCollide(_wordChops[newGeo], _wordDrawingGroup);
 
             Debug.WriteLine(fillTest + " " + bbTest);
+            Debug.WriteLine(_wordGeoLookup[existingGeo].Word);
             if (bbTest || fillTest)
             {
                 adjustment += Math.Min(bounds.Width, bounds.Height) * .2;
@@ -297,7 +301,7 @@ namespace WordCloudTest.Views
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
                     // First word always horizontal 70% Horizontal (default), 30% Vertical
-                    if (_words.Any() && random.Next(0, 10) >= 2)
+                    if (_words.Any() && random.Next(0, 10) >= 8)
                     {
                         angle = WordCloudConstants.MixedRotationVertical;
                     }
