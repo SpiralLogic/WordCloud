@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Windows;
-using WordCloudTest.Annotations;
 
 namespace WordCloudTest.BoundingBox
 {
@@ -16,6 +14,7 @@ namespace WordCloudTest.BoundingBox
         private Size _nodeSize;
         private HierarchicalBoundingBox[] _nodes;
         private bool _isHit;
+        private IList<Rect> _hitCache;
 
         private HierarchicalBoundingBox(Rect bounds, int numberOfNodes = 4)
         {
@@ -46,11 +45,11 @@ namespace WordCloudTest.BoundingBox
         {
             _isHit = hitTest(_bounds);
             if (iterations == 0 || !_isHit) return;
-
-
             var nodeSize = new Size(_bounds.Width / _nodesHorizontal, _bounds.Height / _nodesVertical);
-            if (nodeSize.Width < 1 || nodeSize.Height < 1) return;
+            if (nodeSize.Width < 2 || nodeSize.Height < 2) return;
+            
             _nodes = new HierarchicalBoundingBox[_numberOfNodes];
+
             for (var i = 0; i < _nodesVertical; ++i)
             {
                 for (var j = 0; j < _nodesHorizontal; ++j)
@@ -64,16 +63,22 @@ namespace WordCloudTest.BoundingBox
 
         public IEnumerable<Rect> GetBoxesHit(Rect inter)
         {
+            if (_hitCache != null) return _hitCache;
+            
             inter.X = 0;
             inter.Y = 0;
-            var boxes = new List<Rect>();
-            GetBoxesHitAdd(boxes, inter);
-            return boxes;
+            inter.Width = _bounds.Width;
+            inter.Height= _bounds.Height;
+
+             _hitCache = new List<Rect>();
+            GetBoxesHitAdd(_hitCache, inter);
+            
+            return _hitCache;
         }
 
         private void GetBoxesHitAdd(IList<Rect> boxList, Rect inter)
         {
-            if (!_bounds.IntersectsWith(inter) && !_bounds.Contains(inter) &&!_isHit) return;
+            if (!_isHit && !_bounds.Contains(inter) && !_bounds.IntersectsWith(inter)) return;
             
             if (_nodes != null && _nodes.Any())
             {

@@ -230,13 +230,14 @@ namespace WordCloudTest.Views
             t.Start();
             var bb = new HierarchicalBoundingBox(bounds);
             var depth = (int) Math.Floor(Math.Pow(bounds.Width * bounds.Height / 4.0, .25));
+
+            if (_currentWord > 5) depth-=1;
             bb.Divide(r =>
             {
                 var testbox = new RectangleGeometry(new Rect(new Point(bounds.X + r.X, bounds.Y + r.Y), r.Size));
 
-                var area= new CombinedGeometry(GeometryCombineMode.Intersect,geo.Geometry,testbox);
+                var area = new CombinedGeometry(GeometryCombineMode.Intersect, geo.Geometry, testbox);
                 return !area.IsEmpty();
-
             }, depth);
 
             _wordChops.Add(geo, bb);
@@ -279,7 +280,7 @@ namespace WordCloudTest.Views
 
             if (bbTest)
             {
-                adjustment += Math.Min(bounds.Width, bounds.Height) * .1;
+                adjustment += Math.Min(bounds.Width, bounds.Height) * .05;
                 _previousCollidedWord = dr;
                 return true;
             }
