@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using WordCloudTest.BoundingBox;
 using WordCloudTest.QuadTree;
 using WordCloudTest.WordCloud;
@@ -18,9 +19,8 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2
     {
-        private const int MaxWords = 50;
+        private const int MaxWords = 10;
         private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
-        private readonly Dictionary<Geometry, Rect> _geoBoundsLookup = new Dictionary<Geometry, Rect>();
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         private int _currentWord;
         private DrawingGroup _wordDrawingGroup;
@@ -76,9 +76,6 @@ namespace WordCloudTest.Views
                 _wordDrawingGroup.Children.Add(geo);
             }
 
-
-            BaseImage.Stretch = Stretch.Uniform;
-            Debug.WriteLine(t.ElapsedMilliseconds);
             _currentWord++;
         }
 
@@ -98,7 +95,6 @@ namespace WordCloudTest.Views
 
             //           BaseImage.Stretch = Stretch.UniformToFill;
             //       _mainDrawingGroup.Children.RemoveAt(0);
-            Debug.WriteLine(t.ElapsedMilliseconds);
             _currentWord = 0;
         }
 
@@ -119,19 +115,6 @@ namespace WordCloudTest.Views
 
         public void RestartCloud(WordCloudData wordCloudData)
         {
-            if (_recQuadTree != null)
-            {
-                _mainDrawingGroup.Children.Clear();
-                _geoBoundsLookup.Clear();
-                _wordChops.Clear();
-                _wordDrawingGroup.Children.Clear();
-
-                _recQuadTree = null;
-                _previousCollidedWord = null;
-
-                GC.Collect();
-            }
-
             var s = new Stopwatch();
             s.Start();
             PopulateWordList(wordCloudData);
@@ -159,8 +142,7 @@ namespace WordCloudTest.Views
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
         {
-            HierarchicalBoundingBox<Geometry>.Bbdg.Children.Clear();
-                var text = new FormattedText(word.Word,
+            var text = new FormattedText(word.Word,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
                 CurrentTheme.Typeface,
@@ -175,15 +157,11 @@ namespace WordCloudTest.Views
             var translateTransform = new TranslateTransform(0.0, 0.0);
             transformGroup.Children.Add(translateTransform);
             transformGroup.Children.Add(rotateTransform);
-
-
             textGeometry.Transform = transformGroup;
-            Debug.WriteLine(textGeometry.Bounds);
 
+            textGeometry.FillContains(new Point(1, 1));
             var bounds = textGeometry.Bounds;
-            Debug.WriteLine(bounds);
-
-            ChopWord(textGeometry, bounds);
+            var boundingBox = ChopWord(textGeometry);
 
             var halfGeoWidth = bounds.Width / 2;
             var halfGeoHeight = bounds.Height / 2;
@@ -194,7 +172,6 @@ namespace WordCloudTest.Views
 
             var collide = new Stopwatch();
             collide.Start();
-            var count=0;
             while (PerformCollisionTests(textGeometry, bounds, ref adjustment))
             {
                 var nextPosition = CalculateNextStartingPoint(adjustment);
@@ -204,36 +181,31 @@ namespace WordCloudTest.Views
 
                 translateTransform.X = bounds.X - initialPoint.X;
                 translateTransform.Y = bounds.Y - initialPoint.Y;
-                count++;
             }
-            Debug.WriteLine("shuiffled " + count);
             var geo = new GeometryDrawing
             {
                 Geometry = textGeometry,
                 Brush = new SolidColorBrush(word.Color)
             };
 
-
-
             collide.Stop();
             _previousCollidedWord = null;
             geo.Freeze();
-            Debug.WriteLine(textGeometry.Bounds);
-            Debug.WriteLine(geo.Bounds);
-            Debug.WriteLine(bounds);
-            _geoBoundsLookup.Add(textGeometry, bounds);
+            bounds = geo.Bounds;
+            boundingBox.GlobalLocation = bounds.Location;
+            boundingBox.Freeze();
             _recQuadTree.Insert(textGeometry, bounds);
             _wordGeoLookup.Add(textGeometry, word);
-
             return geo;
         }
 
-        Stopwatch t = new Stopwatch();
-        private Dictionary<Geometry,WordCloudEntry> _wordGeoLookup = new Dictionary<Geometry, WordCloudEntry>();
+        private readonly Dictionary<Geometry, WordCloudEntry> _wordGeoLookup = new Dictionary<Geometry, WordCloudEntry>();
 
-        private void ChopWord(Geometry geo, Rect bounds)
+        private HierarchicalBoundingBox<Geometry> ChopWord(Geometry geo)
         {
-            _wordChops.Add(geo, new HierarchicalBoundingBox<Geometry>(geo, new Rect(0, 0, bounds.Size.Width, bounds.Size.Height), bounds));
+            var bb = new HierarchicalBoundingBox<Geometry>(geo);
+            _wordChops.Add(geo, bb);
+            return bb;
         }
 
         private bool PerformCollisionTests(Geometry newGeometry, Rect bounds, ref double adjustment)
@@ -243,12 +215,10 @@ namespace WordCloudTest.Views
                 if (DoGeometricDrawingsCollide(newGeometry, _previousCollidedWord, bounds, ref adjustment)) return true;
             }
 
-            Debug.WriteLine(_recQuadTree.QueryLocation(bounds).Count());
-            foreach (var existingGeometry in _geoBoundsLookup.Keys)
+            foreach (var existingGeometry in _recQuadTree.QueryLocation(bounds))
             {
                 if (DoGeometricDrawingsCollide(newGeometry, existingGeometry, bounds, ref adjustment)) return true;
             }
-
             return false;
         }
 
@@ -262,19 +232,36 @@ namespace WordCloudTest.Views
                 adjustment = 1.0;
                 return true;
             }
+            //   _wordChops[newGeo].GlobalLocation = bounds.Location;
+            // var bbTest = newGeo.FillContainsWithDetail(existingGeo) != IntersectionDetail.Empty;
+            //      var bbTest = _wordChops[existingGeo].DoBoxesCollide(_wordChops[newGeo]);
 
-            if (!_geoBoundsLookup[existingGeo].Contains(bounds) && !_geoBoundsLookup[existingGeo].IntersectsWith(bounds))
+            var bm = new RenderTargetBitmap((int) Height, (int) Width, DpiScale.DpiScaleX, DpiScale.DpiScaleX, PixelFormats.Pbgra32);
+            DrawingVisual dv = new DrawingVisual();
+            using (var dc = dv.RenderOpen())
             {
-                return false;
+                dc.DrawGeometry(Brushes.Black, null, newGeo);
+            }
+            int[] pixels = new int[bm.PixelWidth * bm.PixelHeight];
+            bm.Render(dv);
+            var bm2 = new RenderTargetBitmap((int) Height, (int) Width, DpiScale.DpiScaleX, DpiScale.DpiScaleX, PixelFormats.Pbgra32);
+            bm.CopyPixels(Int32Rect.Empty, pixels, (PixelFormats.Pbgra32.BitsPerPixel * bm.PixelWidth + 7) / 8, 0);
+
+            DrawingVisual dv2 = new DrawingVisual();
+            using (var dc = dv2.RenderOpen())
+            {
+                dc.DrawGeometry(Brushes.Black, null, existingGeo);
+            }
+            int[] pixels2 = new int[bm2.PixelWidth * bm2.PixelHeight];
+            bm2.Render(dv2);
+            bm2.CopyPixels(Int32Rect.Empty, pixels2, (PixelFormats.Pbgra32.BitsPerPixel * bm.PixelWidth + 7) / 8, 0);
+            bool bbTest = false;
+            for (var i = 0; i < pixels.Length; i++)
+            {
+                if (pixels[i] > 0 && pixels2[i] > 0) bbTest = true;
             }
 
-            _wordChops[newGeo].GlobalBounds = bounds;
-            var fillTest = newGeo.FillContainsWithDetail(existingGeo) != IntersectionDetail.Empty;
-            var bbTest = _wordChops[existingGeo].DoBoxesCollide(_wordChops[newGeo], _wordDrawingGroup);
-
-            Debug.WriteLine(fillTest + " " + bbTest);
-            Debug.WriteLine(_wordGeoLookup[existingGeo].Word);
-            if (bbTest || fillTest)
+            if (bbTest)
             {
                 adjustment += Math.Min(bounds.Width, bounds.Height) * .2;
                 _previousCollidedWord = existingGeo;
@@ -301,7 +288,7 @@ namespace WordCloudTest.Views
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
                     // First word always horizontal 70% Horizontal (default), 30% Vertical
-                    if (_words.Any() && random.Next(0, 10) >= 8)
+                    if (_words.Any() && random.Next(0, 10) >= 11)
                     {
                         angle = WordCloudConstants.MixedRotationVertical;
                     }

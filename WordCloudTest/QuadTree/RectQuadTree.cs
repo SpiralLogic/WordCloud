@@ -51,6 +51,15 @@ namespace WordCloudTest.QuadTree
             return itemList;
         }
 
+        protected override void AddNodeQueryRanges(Rect location, List<T> currentList)
+        {
+            if (Depth == 0 || !IsInRange(location)) return;
+
+            base.AddNodeQueryRanges(location, currentList);
+            
+            currentList.AddRange(_borderItems.Keys);
+        }
+        
         protected override bool IsInRange(Rect location)
         {
             return Boundary.Contains(location);
