@@ -5,3 +5,4 @@
 /WordCloudTest/obj
 /WordCloudTest/bin/Debug
 /.vs
+*.diagsession
