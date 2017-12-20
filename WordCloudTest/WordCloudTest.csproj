@@ -21,10 +21,11 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -58,6 +59,11 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Bitmap\BitmapBase.cs" />
+    <Compile Include="Bitmap\BitmapContext.cs" />
+    <Compile Include="Bitmap\BitmapExtensions.cs" />
+    <Compile Include="Bitmap\BitmapFactory.cs" />
+    <Compile Include="Bitmap\BitmapTransformation.cs" />
     <Compile Include="BoundingBox\HierarchicalBoundingBox.cs" />
     <Compile Include="QuadTree\PointQuadTree.cs" />
     <Compile Include="QuadTree\QuadTreeBase.cs" />
@@ -126,6 +132,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Bitmap\BitmapFactory\" />
     <Folder Include="ViewModels\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

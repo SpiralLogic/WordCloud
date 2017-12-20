@@ -204,7 +204,7 @@ namespace WordCloudTest.Views
         }
 
         private readonly Dictionary<GeometryDrawing, WordCloudEntry> _wordGeoLookup = new Dictionary<GeometryDrawing, WordCloudEntry>();
-        private Dictionary<GeometryDrawing, RenderTargetBitmap> _bitmapCache = new Dictionary<GeometryDrawing, RenderTargetBitmap>();
+        private Dictionary<GeometryDrawing, WriteableBitmap> _bitmapCache = new Dictionary<GeometryDrawing, WriteableBitmap>();
 
 /*
         private HierarchicalBoundingBox<GeometryDrawing> ChopWord(GeometryDrawing geo)
@@ -217,15 +217,20 @@ namespace WordCloudTest.Views
 
         private bool PerformCollisionTests(GeometryDrawing newGeometry, Rect bounds, ref double adjustment, Transform t)
         {
+            if (_currentWord == 0)
+            {
+                _mainImageBitmap = GetPixels(newGeometry);
+            }
+            
             if (_previousCollidedWord != null && adjustment > 0 && !Equals(newGeometry, _previousCollidedWord))
             {
                 if (DoGeometricDrawingsCollide(newGeometry, _previousCollidedWord, bounds, ref adjustment, t)) return true;
             }
-         //   var found = _recQuadTree.QueryLocation(bounds).Where(x => x != _previousCollidedWord).ToList();
+            //   var found = _recQuadTree.QueryLocation(bounds).Where(x => x != _previousCollidedWord).ToList();
             var found = _wordGeoLookup.Keys.Where(x => !Equals(x, newGeometry)).ToList();
             Debug.WriteLine("Placing: " + _wordGeoLookup[newGeometry].Word);
             Debug.WriteLine("Found: " + string.Join(" ", found.Select((k, v) => _wordGeoLookup[k].Word)));
-            foreach (var existingGeometry in  found)
+            foreach (var existingGeometry in found)
             {
                 Debug.WriteLine("Avoid: " + _wordGeoLookup[existingGeometry].Word);
 
@@ -239,8 +244,11 @@ namespace WordCloudTest.Views
             return false;
         }
 
+        private WriteableBitmap _mainImageBitmap;
+        
         private bool DoGeometricDrawingsCollide(GeometryDrawing newGeo, GeometryDrawing existingGeo, Rect bounds, ref double adjustment, Transform t)
         {
+            bounds = newGeo.Bounds;
             if (Equals(newGeo, existingGeo)) return true;
             if (bounds.X < 0 || bounds.Y < 0 || bounds.Right > Width || bounds.Top > Height)
             {
@@ -252,54 +260,36 @@ namespace WordCloudTest.Views
             // var bbTest = newGeo.FillContainsWithDetail(existingGeo) != IntersectionDetail.Empty;
             //      var bbTest = _wordChops[existingGeo].DoBoxesCollide(_wordChops[newGeo]);
 
-            var pixels2 = GetPixels(existingGeo, newGeo.Geometry.Bounds, true);
-            var pixels = GetPixels(newGeo, newGeo.Geometry.Bounds);
-            Debug.WriteLine(pixels.Max());
-            Debug.WriteLine(pixels2.Max());
-            for (var i = 0; i < pixels.Length; i++)
-            {
-                if (pixels[i] > 0 && pixels2[i] > 0)
-                {
-                    adjustment += Math.Min(bounds.Width, bounds.Height) * .5;
-                    _previousCollidedWord = existingGeo;
-                    Console.WriteLine(i);
-                    return true;
-                }
-            }
+            var pixel = _mainImageBitmap.Crop(bounds);
+            var pixel2 = GetPixels(newGeo).Crop(bounds);
+
+            int index = 0;
+           pixel.ForEach((x,y,color) =>
+           {
+               if (pixel2.GetPixel(x, y).A == color.A)
+               {
+                   
+               }
+           });
+            
+           
             return false;
         }
 
-        private int[] GetPixels(GeometryDrawing existingGeo, Rect r, bool useCache = false)
+        private WriteableBitmap GetPixels(GeometryDrawing existingGeo)
         {
-            
-            var r2 = new Int32Rect((int) r.Width, (int) r.Height, (int) r.X, (int) r.Y);
-
-            var stride = ((int)Width * PixelFormats.Pbgra32.BitsPerPixel + 7) / 8;
-            var pixels = new int[(int)Height * stride];
-
-            if (useCache && _bitmapCache.TryGetValue(existingGeo, out var bm2))
-            {
-                bm2.CopyPixels(Int32Rect.Empty, pixels, stride, 0);
-
-                return pixels;
-            }
-
-
             var bm = new RenderTargetBitmap((int) Width, (int) Height, DpiScale.PixelsPerInchX, DpiScale.PixelsPerInchY, PixelFormats.Pbgra32);
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
                 dc.DrawDrawing(existingGeo);
             }
-            //dv.Transform = t;
             bm.Render(dv);
-      //      BaseImage.Source = bm;
             
-            BaseImage.C
-            bm.CopyPixels(Int32Rect.Empty, pixels, stride, 0);
-            if (useCache) _bitmapCache[existingGeo] = bm;
+            var wbmp = new WriteableBitmap(bm);
+            
 
-            return pixels;
+            return wbmp;
         }
 
         private void PopulateWordList(WordCloudData wordCloudData)
