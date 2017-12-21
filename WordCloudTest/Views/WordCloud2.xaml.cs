@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media;
@@ -17,7 +18,7 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2
     {
-        private const int MaxWords = 100;
+        private const int MaxWords = 200;
         private readonly PixelFormat _pixelFormat = PixelFormats.Pbgra32;
         private const int Pbgra32Bytes = 4;
         private const int Pbgra32Alpha = 0;
@@ -25,11 +26,17 @@ namespace WordCloudTest.Views
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         private int _currentWord;
         private DrawingGroup _wordDrawingGroup;
-
-        private CenterPoints _currentCenterPoint = CenterPoints.M;
+        private double _cloudWidth;
+        private double _cloudHeight;
         private double _fontMultiplier;
         private int _minWordWeight;
         private readonly DrawingGroup _mainDrawingGroup;
+
+        private bool[] _collisionMap;
+        private int _collisionMapWidth;
+        private int _collisionMapHeight;
+        private Rect _lastPlacedBounds;
+        private const int Buffer = 3;
 
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
 
@@ -47,18 +54,21 @@ namespace WordCloudTest.Views
 
         private void Setup()
         {
+            _cloudWidth = Width;
+            _cloudHeight = Height;
             _minWordWeight = _words.Min(e => e.wordWeight);
             _fontMultiplier = GetFontMultiplier();
             var bgDrawingGroup = new DrawingGroup();
             _wordDrawingGroup = new DrawingGroup();
+            BaseImage.Stretch = Stretch.None;
 
             using (var context = bgDrawingGroup.Open())
             {
-                context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, Width, Height));
+                context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, _cloudWidth, _cloudHeight));
             }
 
             bgDrawingGroup.Freeze();
-
+            _wordDrawingGroup.Transform = null;
             _mainDrawingGroup.Children.Add(bgDrawingGroup);
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
         }
@@ -74,6 +84,19 @@ namespace WordCloudTest.Views
             }
 
             _currentWord++;
+
+            _mainDrawingGroup.Children.Clear();
+            _mainDrawingGroup.Children.Add(_wordDrawingGroup);
+            var finalTransformGroup = new TransformGroup();
+            _wordDrawingGroup.Transform = finalTransformGroup;
+
+            if (_wordDrawingGroup.Bounds.Width > _cloudWidth || _wordDrawingGroup.Bounds.Height > _cloudHeight)
+            {
+                finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, BaseImage.RenderSize.Width / 2, BaseImage.RenderSize.Height / 2));
+            }
+
+            finalTransformGroup.Children.Add(new TranslateTransform(-(_cloudWidth - _wordDrawingGroup.Bounds.Width) / 2, -(_cloudHeight - _wordDrawingGroup.Bounds.Height) / 2));
+
         }
 
         public void AddWords()
@@ -87,12 +110,25 @@ namespace WordCloudTest.Views
                     _wordDrawingGroup.Children.Add(geo);
                 }
 
-                Debug.WriteLine(_currentWord + " " + word.Word);
                 _currentWord++;
             }
+            
+            _mainDrawingGroup.Children.Clear();
+            _mainDrawingGroup.Children.Add(_wordDrawingGroup);
+            var finalTransformGroup = new TransformGroup();
+            _wordDrawingGroup.Transform = finalTransformGroup;
+            var wordGroupBounds = _wordDrawingGroup.Bounds;
+            if (wordGroupBounds.Width > _cloudWidth || wordGroupBounds.Height > _cloudHeight)
+            {
+                finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, BaseImage.RenderSize.Width / 2, BaseImage.RenderSize.Height / 2));
+            }
+            else
+            {
+                BaseImage.Stretch = Stretch.Uniform;
+            }
 
-            //           BaseImage.Stretch = Stretch.UniformToFill;
-            //       _mainDrawingGroup.Children.RemoveAt(0);
+            finalTransformGroup.Children.Add(new TranslateTransform(-(_cloudWidth - wordGroupBounds.Width) / 2, -(_cloudHeight - wordGroupBounds.Height) / 2));
+
             _currentWord = 0;
         }
 
@@ -124,38 +160,86 @@ namespace WordCloudTest.Views
 
         private bool _spiralMode = true;
 
-        private bool CalculateNextStartingPoint(ref Rect bounds, double adjustment = 0.0)
+        private bool CalculateNextStartingPoint(ref Rect bounds, ref double adjustment)
         {
-            if (adjustment < 0.0)
+            if (_spiralMode && SpiralPoint(ref bounds, ref adjustment)) return true;
+
+            _spiralMode = false;
+
+            if (RectPoint(ref bounds, ref adjustment)) return true;
+
+
+            return false;
+        }
+
+        private bool SpiralPoint(ref Rect bounds, ref double adjustment)
+        {
+            if (bounds.Bottom > _collisionMapHeight || bounds.Right > _collisionMapWidth || bounds.X < 0 || bounds.Y < 0)
+            {
+                adjustment += WordCloudConstants.DoublePi / 40;
+            }
+            else
+            {
+                adjustment += WordCloudConstants.DoublePi / 50;
+            }
+
+            if (adjustment > WordCloudConstants.MaxSprialLength)
             {
                 return false;
             }
 
-            var center = new Point();
-            if (adjustment > WordCloudConstants.MaxSprialLength || Math.Abs(adjustment) < 0.001)
-            {
-                if (_lastplacedbounds != Rect.Empty)
-                {
-                    center.X = _lastplacedbounds.X;
-                    center.X = _lastplacedbounds.Y;
-                    _lastplacedbounds = Rect.Empty;
-                    adjustment = 1.0;
-                }
-                else
-                {
-                    _spiralMode = false;
-                    bounds.X = Width / 2;
-                    bounds.Y = Height / 4;
-                    return false;
-                }
-            }
 
+            var center = new Point();
             var multi = adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
             var angle = adjustment % WordCloudConstants.DoublePi;
 
-            bounds.X = Width / 2 + multi * Math.Sin(angle) + center.X;
-            bounds.Y = Height / 2 + multi * Math.Cos(angle) + center.Y;
+            bounds.X = _cloudWidth / 2 + multi * Math.Sin(-angle) + center.X;
+            bounds.Y = _cloudHeight / 2 + multi * Math.Cos(-angle) + center.Y;
+
             return true;
+        }
+
+        private bool RectPoint(ref Rect bounds, ref double adjustment)
+        {
+            if (_lastPlacedBounds == Rect.Empty) return false;
+
+
+            var maxRight = _cloudWidth;
+            var maxBottom = _cloudHeight;
+
+            if (bounds.Right + adjustment < maxRight && bounds.Bottom > (_cloudWidth - Buffer * 2) / 2)
+            {
+                bounds.X += adjustment;
+
+                return true;
+            }
+
+            if (bounds.Right + adjustment > maxRight && bounds.Bottom + adjustment < maxBottom && bounds.Right > (_cloudWidth - Buffer * 2) / 2)
+            {
+                bounds.X = maxRight;
+                bounds.Y += adjustment;
+
+                return true;
+            }
+
+            if (bounds.Right - adjustment > 0 && bounds.Bottom + adjustment > maxBottom)
+            {
+                bounds.X -= adjustment;
+                bounds.Y = maxBottom;
+
+                return true;
+            }
+
+            if (bounds.Right - adjustment > 0 && bounds.Bottom - adjustment > 0)
+            {
+                bounds.Y -= adjustment;
+                bounds.X = 4;
+
+                return true;
+            }
+
+            _lastPlacedBounds = Rect.Empty;
+            return false;
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -183,7 +267,8 @@ namespace WordCloudTest.Views
             var geo = new GeometryDrawing
             {
                 Geometry = textGeometry,
-                Brush = new SolidColorBrush(word.Color),Pen = new Pen(Brushes.Transparent,10)
+                Brush = new SolidColorBrush(word.Color),
+                Pen = new Pen(Brushes.Transparent, 10)
             };
 
             var adjustment = 0.0;
@@ -198,18 +283,15 @@ namespace WordCloudTest.Views
             }
 
             var bitmap = GetPixels(textGeometry, ref bounds);
-            byte[] newBytes;
-            using (bitmap.GetBitmapContext(ReadWriteMode.ReadOnly))
-            {
-                newBytes = bitmap.ToByteArray();
-            }
+            var newBytes = new byte[bitmap.PixelHeight * (bitmap.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8];
+            bitmap.CopyPixels(newBytes, (bitmap.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8, 0);
 
-            bounds.X = (Width - bounds.Width) / 2;
-            bounds.Y = (Height - bounds.Height) / 2;
+            bounds.X = (_cloudWidth - bounds.Width) / 2;
+            bounds.Y = (_cloudHeight - bounds.Height) / 2;
             _spiralMode = true;
-            while (PerformCollisionTests(newBytes, ref bounds, ref adjustment))
+            while (PerformCollisionTests(newBytes, ref bounds))
             {
-                if (!CalculateNextStartingPoint(ref bounds, adjustment))
+                if (!CalculateNextStartingPoint(ref bounds, ref adjustment))
                 {
                     Debug.WriteLine("Failed: " + word.Word + " " + _spiralMode);
                     return null;
@@ -222,29 +304,26 @@ namespace WordCloudTest.Views
 
             collide.Stop();
             geo.Freeze();
-            _lastplacedbounds = bounds;
+            _lastPlacedBounds = bounds;
             return geo;
         }
 
         private void SetupCollisionMap(Geometry textGeometry, ref Rect bounds)
         {
-            var center = new Point(Width / 2 - bounds.Width / 2, Height / 2 - bounds.Height / 2);
-            var centretransform = new TranslateTransform(center.X, center.Y);
+            var center = new Point(_cloudWidth / 2 - bounds.Width / 2, _cloudHeight / 2 - bounds.Height / 2);
+            var centerTransform = new TranslateTransform(center.X, center.Y);
 
             var transformGroup = textGeometry.Transform as TransformGroup;
-            transformGroup?.Children.Add(centretransform);
+            transformGroup?.Children.Add(centerTransform);
 
-            bounds.Width = Width;
-            bounds.Height = Height;
+            bounds.Width = _cloudWidth;
+            bounds.Height = _cloudHeight;
 
             var mainImageBitmap = GetPixels(textGeometry, ref bounds);
-            int totalPixels;
-            byte[] mainImageBytes;
-            using (mainImageBitmap.GetBitmapContext(ReadWriteMode.ReadOnly))
-            {
-                mainImageBytes = mainImageBitmap.ToByteArray();
-                totalPixels = mainImageBytes.Length / Pbgra32Bytes;
-            }
+            var mainImageBytes = new byte[mainImageBitmap.PixelHeight * (mainImageBitmap.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8];
+            mainImageBitmap.CopyPixels(mainImageBytes, (mainImageBitmap.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8, 0);
+            var totalPixels = mainImageBytes.Length / Pbgra32Bytes;
+
 
             _collisionMap = new bool[totalPixels];
             _collisionMapWidth = mainImageBitmap.PixelWidth;
@@ -252,23 +331,25 @@ namespace WordCloudTest.Views
 
             for (var i = 0; i < totalPixels; ++i)
             {
-                _collisionMap[i] = mainImageBytes[i * Pbgra32Bytes + 3] > 0;
+                if (mainImageBytes[i * Pbgra32Bytes + 3] > 0) AddNewCollisionPoint(i);
             }
         }
 
-        private bool PerformCollisionTests(IReadOnlyList<byte> newBytes, ref Rect bounds, ref double adjustment)
+        private void AddNewCollisionPoint(int i)
         {
-            if (bounds.Y + bounds.Height > _collisionMapHeight ||
-                bounds.X + bounds.Width > _collisionMapWidth ||
-                bounds.X < 0 ||
-                bounds.Y < 0)
-            {
-                adjustment += WordCloudConstants.DoublePi / 10;
+            var y = i / _collisionMapWidth;
+            var x = i % _collisionMapWidth;
+            _collisionMap[i] = true;
 
-                return true;
-            }
+            if (x + Buffer < _collisionMapWidth) _collisionMap[i + Buffer] = true;
+            if (y + Buffer < _collisionMapHeight) _collisionMap[i + _collisionMapHeight * Buffer] = true;
+            if (x - Buffer > 0) _collisionMap[i - Buffer] = true;
+            if (y - Buffer > 0) _collisionMap[i - _collisionMapHeight * Buffer] = true;
+        }
 
-            adjustment += WordCloudConstants.DoublePi / 50;
+        private bool PerformCollisionTests(IReadOnlyList<byte> newBytes, ref Rect bounds)
+        {
+            if (bounds.Right > _cloudWidth - 2 || bounds.Bottom > _cloudHeight - 2 || bounds.X < 2 || bounds.Y < 2) return true;
 
             var srcWidth = _collisionMapWidth;
             var testBoundary = bounds;
@@ -280,11 +361,11 @@ namespace WordCloudTest.Views
             for (var line = 0; line < testHeight; ++line)
             {
                 var mapPosition = (testY + line) * srcWidth + testX;
-                var testOffest = line * testWidth * Pbgra32Bytes;
+                var testOffset = line * testWidth * Pbgra32Bytes;
 
                 for (var i = 0; i < testWidth * Pbgra32Bytes; i += 4)
                 {
-                    if (_collisionMap[mapPosition + i / 4] && newBytes[testOffest + i] != Pbgra32Alpha) return true;
+                    if (_collisionMap[mapPosition + i / 4] && newBytes[testOffset + i] != Pbgra32Alpha) return true;
                 }
             }
 
@@ -298,7 +379,7 @@ namespace WordCloudTest.Views
                 copyRectangle.X + copyRectangle.Width < 0 ||
                 copyRectangle.Y + copyRectangle.Height < 0)
             {
-                throw new IndexOutOfRangeException("Image copyRectangle are out of range");
+                throw new ArgumentOutOfRangeException(nameof(newBytes));
             }
 
             var srcWidth = _collisionMapWidth;
@@ -310,19 +391,14 @@ namespace WordCloudTest.Views
             for (var line = 0; line < testHeight; ++line)
             {
                 var mapPosition = (testY + line) * srcWidth + testX;
-                var testOffest = line * testWidth * Pbgra32Bytes;
+                var testOffset = line * testWidth * Pbgra32Bytes;
 
                 for (var i = 0; i < testWidth * Pbgra32Bytes; i += Pbgra32Bytes)
                 {
-                    if (newBytes[testOffest + i] > 0) _collisionMap[mapPosition + i / Pbgra32Bytes] = true;
+                    if (newBytes[testOffset + i] > 0) AddNewCollisionPoint(mapPosition + i / Pbgra32Bytes);
                 }
             }
         }
-
-        private bool[] _collisionMap;
-        private int _collisionMapWidth;
-        private int _collisionMapHeight;
-        private Rect _lastplacedbounds;
 
         private WriteableBitmap GetPixels(Geometry existingGeo, ref Rect bounds)
         {
@@ -330,9 +406,8 @@ namespace WordCloudTest.Views
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawGeometry(Brushes.Purple, new Pen(Brushes.Purple, 10),  existingGeo);
+                dc.DrawGeometry(Brushes.Purple, new Pen(Brushes.Purple, 10), existingGeo);
             }
-
             bm.Render(dv);
 
             return new WriteableBitmap(bm);
@@ -357,7 +432,11 @@ namespace WordCloudTest.Views
 
         private void PopulateWordList(WordCloudData wordCloudData)
         {
-            var random = new Random();
+            // Create a byte array to hold the random value.
+            byte[] randomNumber = new byte[1];
+
+            // Create a new instance of the RNGCryptoServiceProvider. 
+            RNGCryptoServiceProvider Gen = new RNGCryptoServiceProvider();
             foreach (var row in wordCloudData.Words.Rows.Take(MaxWords))
             {
                 var colorIndex = 0;
@@ -366,13 +445,19 @@ namespace WordCloudTest.Views
                 // Theme's define a color list, randomly assign one by index
                 if (CurrentTheme.ColorList.Count > 1)
                 {
-                    colorIndex = random.Next(0, CurrentTheme.ColorList.Count);
+                    Gen.GetBytes(randomNumber);
+                    var rand = Convert.ToInt32(randomNumber[0]);
+
+                    colorIndex = rand % CurrentTheme.ColorList.Count;
                 }
 
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
+                    Gen.GetBytes(randomNumber);
+                    var rand = Convert.ToInt32(randomNumber[0]);
+
                     // First word always horizontal 70% Horizontal (default), 30% Vertical
-                    if (_words.Any() && random.Next(0, 10) >= 7)
+                    if (_words.Any() && rand % 10 >= 7)
                     {
                         angle = WordCloudConstants.MixedRotationVertical;
                     }
@@ -382,8 +467,9 @@ namespace WordCloudTest.Views
                     // First word always horizontal
                     if (!_words.Any())
                     {
-                        angle = -WordCloudConstants.RandomMaxRotationAbs +
-                                random.Next(0, WordCloudConstants.RandomRange);
+                        Gen.GetBytes(randomNumber);
+                        var rand = Convert.ToInt32(randomNumber[0]);
+                        angle = -WordCloudConstants.RandomMaxRotationAbs + rand % WordCloudConstants.RandomRange;
                     }
                 }
 
@@ -406,7 +492,7 @@ namespace WordCloudTest.Views
             var wordWeightRange = Math.Max(0.00001, maxWordWeight - _minWordWeight);
             var areaPerLetter = GetAverageLetterPixelWidth() / wordWeightRange;
 
-            var targetWidth = (Width + Height) / WordCloudConstants.TargetWidthFactor * WordCloudConstants.LargestSizeWidthProportion;
+            var targetWidth = (_cloudWidth + _cloudHeight) / WordCloudConstants.TargetWidthFactor * WordCloudConstants.LargestSizeWidthProportion;
             var largestWord = _words.OrderByDescending(e => (e.wordWeight - _minWordWeight) * e.Word.Length).First();
 
             // Use minimum word length of MINIMUM_LARGEST_WORD_LENGTH to avoid over scaling
@@ -441,15 +527,6 @@ namespace WordCloudTest.Views
                 DpiScale.PixelsPerDip);
 
             return txt.Width;
-        }
-
-        private enum CenterPoints
-        {
-            M,
-            R,
-            T,
-            L,
-            B
         }
     }
 }

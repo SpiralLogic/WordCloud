@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WordCloudTest.Views"
         mc:Ignorable="d"
-        Title="MainWindow" Height="900" Width="900" BorderThickness="0">
+        Title="MainWindow" Height="900" Width="800" BorderThickness="0">
     <StackPanel>
         <local:WordCloud2 DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="800" Width="800"></local:WordCloud2>
         <Button Click="AddWord" Content="add"></Button>
