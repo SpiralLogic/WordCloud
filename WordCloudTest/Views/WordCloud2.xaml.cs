@@ -87,6 +87,7 @@ namespace WordCloudTest.Views
                     _wordDrawingGroup.Children.Add(geo);
                 }
 
+                Debug.WriteLine(_currentWord + " " + word.Word);
                 _currentWord++;
             }
 
@@ -121,19 +122,40 @@ namespace WordCloudTest.Views
             Debug.WriteLine(s.ElapsedMilliseconds);
         }
 
-        private void CalculateNextStartingPoint(ref Rect bounds, double adjustment = 0.0)
+        private bool _spiralMode = true;
+
+        private bool CalculateNextStartingPoint(ref Rect bounds, double adjustment = 0.0)
         {
-            if (adjustment > WordCloudConstants.MaxSprialLength || Math.Abs(adjustment) < 0.1)
+            if (adjustment < 0.0)
             {
-                adjustment = 1.0;
-                _currentCenter = GetCenterPoint();
+                return false;
+            }
+
+            var center = new Point();
+            if (adjustment > WordCloudConstants.MaxSprialLength || Math.Abs(adjustment) < 0.001)
+            {
+                if (_lastplacedbounds != Rect.Empty)
+                {
+                    center.X = _lastplacedbounds.X;
+                    center.X = _lastplacedbounds.Y;
+                    _lastplacedbounds = Rect.Empty;
+                    adjustment = 1.0;
+                }
+                else
+                {
+                    _spiralMode = false;
+                    bounds.X = Width / 2;
+                    bounds.Y = Height / 4;
+                    return false;
+                }
             }
 
             var multi = adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
             var angle = adjustment % WordCloudConstants.DoublePi;
 
-            bounds.X = Width / 2 + multi * Math.Sin(angle) + _currentCenter.X;
-            bounds.Y = Height / 2 + multi * Math.Cos(angle) + _currentCenter.Y;
+            bounds.X = Width / 2 + multi * Math.Sin(angle) + center.X;
+            bounds.Y = Height / 2 + multi * Math.Cos(angle) + center.Y;
+            return true;
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -161,7 +183,7 @@ namespace WordCloudTest.Views
             var geo = new GeometryDrawing
             {
                 Geometry = textGeometry,
-                Brush = new SolidColorBrush(word.Color),
+                Brush = new SolidColorBrush(word.Color),Pen = new Pen(Brushes.Transparent,10)
             };
 
             var adjustment = 0.0;
@@ -171,6 +193,7 @@ namespace WordCloudTest.Views
             if (_currentWord == 0)
             {
                 SetupCollisionMap(textGeometry, ref bounds);
+                geo.Freeze();
                 return geo;
             }
 
@@ -183,11 +206,15 @@ namespace WordCloudTest.Views
 
             bounds.X = (Width - bounds.Width) / 2;
             bounds.Y = (Height - bounds.Height) / 2;
+            _spiralMode = true;
             while (PerformCollisionTests(newBytes, ref bounds, ref adjustment))
             {
-                CalculateNextStartingPoint(ref bounds, adjustment);
+                if (!CalculateNextStartingPoint(ref bounds, adjustment))
+                {
+                    Debug.WriteLine("Failed: " + word.Word + " " + _spiralMode);
+                    return null;
+                }
             }
-
 
             translateTransform.X += bounds.X;
             translateTransform.Y += bounds.Y;
@@ -195,6 +222,7 @@ namespace WordCloudTest.Views
 
             collide.Stop();
             geo.Freeze();
+            _lastplacedbounds = bounds;
             return geo;
         }
 
@@ -210,19 +238,21 @@ namespace WordCloudTest.Views
             bounds.Height = Height;
 
             var mainImageBitmap = GetPixels(textGeometry, ref bounds);
+            int totalPixels;
             byte[] mainImageBytes;
             using (mainImageBitmap.GetBitmapContext(ReadWriteMode.ReadOnly))
             {
                 mainImageBytes = mainImageBitmap.ToByteArray();
+                totalPixels = mainImageBytes.Length / Pbgra32Bytes;
             }
 
-            var totalPixels = mainImageBytes.Length / Pbgra32Bytes;
             _collisionMap = new bool[totalPixels];
             _collisionMapWidth = mainImageBitmap.PixelWidth;
             _collisionMapHeight = mainImageBitmap.PixelHeight;
+
             for (var i = 0; i < totalPixels; ++i)
             {
-                _collisionMap[i] = mainImageBytes[i * Pbgra32Bytes] != Pbgra32Alpha;
+                _collisionMap[i] = mainImageBytes[i * Pbgra32Bytes + 3] > 0;
             }
         }
 
@@ -230,15 +260,15 @@ namespace WordCloudTest.Views
         {
             if (bounds.Y + bounds.Height > _collisionMapHeight ||
                 bounds.X + bounds.Width > _collisionMapWidth ||
-                bounds.X + bounds.Width < 0 ||
-                bounds.Y + bounds.Height < 0)
+                bounds.X < 0 ||
+                bounds.Y < 0)
             {
-                adjustment = 0.0;
+                adjustment += WordCloudConstants.DoublePi / 10;
 
                 return true;
             }
 
-            adjustment += 1;
+            adjustment += WordCloudConstants.DoublePi / 50;
 
             var srcWidth = _collisionMapWidth;
             var testBoundary = bounds;
@@ -252,9 +282,9 @@ namespace WordCloudTest.Views
                 var mapPosition = (testY + line) * srcWidth + testX;
                 var testOffest = line * testWidth * Pbgra32Bytes;
 
-                for (var i = 0; i < testWidth; ++i)
+                for (var i = 0; i < testWidth * Pbgra32Bytes; i += 4)
                 {
-                    if (_collisionMap[mapPosition + i] && newBytes[testOffest + i] != Pbgra32Alpha) return true;
+                    if (_collisionMap[mapPosition + i / 4] && newBytes[testOffest + i] != Pbgra32Alpha) return true;
                 }
             }
 
@@ -282,27 +312,25 @@ namespace WordCloudTest.Views
                 var mapPosition = (testY + line) * srcWidth + testX;
                 var testOffest = line * testWidth * Pbgra32Bytes;
 
-                for (var i = 0; i < testWidth; ++i)
+                for (var i = 0; i < testWidth * Pbgra32Bytes; i += Pbgra32Bytes)
                 {
-                    if (newBytes[testOffest + i] > Pbgra32Alpha) _collisionMap[mapPosition + i] = true;
+                    if (newBytes[testOffest + i] > 0) _collisionMap[mapPosition + i / Pbgra32Bytes] = true;
                 }
             }
         }
 
-        private Point _currentCenter;
         private bool[] _collisionMap;
         private int _collisionMapWidth;
         private int _collisionMapHeight;
+        private Rect _lastplacedbounds;
 
         private WriteableBitmap GetPixels(Geometry existingGeo, ref Rect bounds)
         {
-            bounds.Width += 2;
-            bounds.Height += 2;
             var bm = new RenderTargetBitmap((int) bounds.Width, (int) bounds.Height, 96, 96, _pixelFormat);
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawGeometry(Brushes.Black, null, existingGeo);
+                dc.DrawGeometry(Brushes.Purple, new Pen(Brushes.Purple, 10),  existingGeo);
             }
 
             bm.Render(dv);
@@ -370,42 +398,6 @@ namespace WordCloudTest.Views
                     }
                 );
             }
-        }
-
-        private Point GetCenterPoint()
-        {
-            Point point;
-            switch (_currentCenterPoint)
-            {
-                case CenterPoints.M:
-                    point = new Point((int) (Width / 2), (int) (Height / 2));
-                    break;
-                case CenterPoints.R:
-                    point = new Point((int) (Width / 4), (int) (Height / 4));
-                    break;
-                case CenterPoints.T:
-                    point = new Point((int) (Width / 4), (int) (3 * Height / 2));
-                    break;
-                case CenterPoints.L:
-                    point = new Point((int) (3 * Width / 4), (int) (Height / 2));
-                    break;
-                case CenterPoints.B:
-                    point = new Point((int) (3 * Width / 4), (int) (3 * Height / 4));
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            if (_currentCenterPoint == CenterPoints.B)
-            {
-                _currentCenterPoint = CenterPoints.M;
-            }
-            else
-            {
-                _currentCenterPoint = _currentCenterPoint + 1;
-            }
-
-            return point;
         }
 
         private double GetFontMultiplier()
