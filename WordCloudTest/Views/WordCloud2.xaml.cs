@@ -7,8 +7,6 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using WordCloudTest.BoundingBox;
-using WordCloudTest.QuadTree;
 using WordCloudTest.WordCloud;
 using WordCloudTest.WordClouds;
 
@@ -19,7 +17,10 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2
     {
-        private const int MaxWords = 10;
+        private const int MaxWords = 100;
+        private readonly PixelFormat _pixelFormat = PixelFormats.Pbgra32;
+        private const int Pbgra32Bytes = 4;
+        private const int Pbgra32Alpha = 0;
         private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         private int _currentWord;
@@ -29,11 +30,7 @@ namespace WordCloudTest.Views
         private double _fontMultiplier;
         private int _minWordWeight;
         private readonly DrawingGroup _mainDrawingGroup;
-        private GeometryDrawing _previousCollidedWord;
 
-        private RectQuadTree<GeometryDrawing> _recQuadTree;
-
-        //     private readonly Dictionary<GeometryDrawing, HierarchicalBoundingBox<GeometryDrawing>> _wordChops = new Dictionary<GeometryDrawing, HierarchicalBoundingBox<GeometryDrawing>>();
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
 
         public WordCloud2()
@@ -52,8 +49,6 @@ namespace WordCloudTest.Views
         {
             _minWordWeight = _words.Min(e => e.wordWeight);
             _fontMultiplier = GetFontMultiplier();
-            _recQuadTree = new RectQuadTree<GeometryDrawing>(new Rect(0, 0, Width, Height));
-
             var bgDrawingGroup = new DrawingGroup();
             _wordDrawingGroup = new DrawingGroup();
 
@@ -126,20 +121,19 @@ namespace WordCloudTest.Views
             Debug.WriteLine(s.ElapsedMilliseconds);
         }
 
-        private Point CalculateNextStartingPoint(double adjustment = 0.0)
+        private void CalculateNextStartingPoint(ref Rect bounds, double adjustment = 0.0)
         {
-            var center = new Point();
-            if (adjustment > WordCloudConstants.MaxSprialLength)
+            if (adjustment > WordCloudConstants.MaxSprialLength || Math.Abs(adjustment) < 0.1)
             {
-                adjustment = 2.0;
-                center = GetCenterPoint();
+                adjustment = 1.0;
+                _currentCenter = GetCenterPoint();
             }
 
             var multi = adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
             var angle = adjustment % WordCloudConstants.DoublePi;
-            var spiralPoint = new Point(Width / 2 + multi * Math.Sin(angle), Height / 2 + multi * Math.Cos(angle));
-            //return new Point(Width / 2 + multi * Math.Sin(angle), Height / 2 + multi * Math.Cos(angle));
-            return new Point(spiralPoint.X + center.X, spiralPoint.Y + center.Y);
+
+            bounds.X = Width / 2 + multi * Math.Sin(angle) + _currentCenter.X;
+            bounds.Y = Height / 2 + multi * Math.Cos(angle) + _currentCenter.Y;
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -151,145 +145,186 @@ namespace WordCloudTest.Views
                 GetFontSize(word.wordWeight),
                 new SolidColorBrush(word.Color),
                 DpiScale.PixelsPerDip);
-
-            var textGeometry = text.BuildGeometry(new Point(Width / 2 - text.Width / 2, Height / 2 - text.Height / 2));
+            var textGeometry = text.BuildGeometry(new Point(0, 0));
+            var bounds = textGeometry.Bounds;
 
             var transformGroup = new TransformGroup();
-            var rotateTransform = new RotateTransform(word.Angle, Width / 2 - text.Width / 2, Width / 2 - text.Height / 2);
-            var translateTransform = new TranslateTransform(0.0, 0.0);
-            transformGroup.Children.Add(translateTransform);
+            var rotateTransform = new RotateTransform(word.Angle, text.Width / 2, text.Height / 2);
             transformGroup.Children.Add(rotateTransform);
+
             textGeometry.Transform = transformGroup;
 
+            bounds = rotateTransform.TransformBounds(bounds);
+            var translateTransform = new TranslateTransform(-bounds.X, -bounds.Y);
+            transformGroup.Children.Add(translateTransform);
+            bounds = translateTransform.TransformBounds(bounds);
             var geo = new GeometryDrawing
             {
                 Geometry = textGeometry,
                 Brush = new SolidColorBrush(word.Color),
             };
 
-            var bounds = geo.Bounds;
-            //      var boundingBox = ChopWord(textGeometry);
-
-            var halfGeoWidth = bounds.Width / 2;
-            var halfGeoHeight = bounds.Height / 2;
-
-            var initialPoint = bounds;
-
             var adjustment = 0.0;
 
             var collide = new Stopwatch();
             collide.Start();
-            _wordGeoLookup.Add(geo, word);
-            while (PerformCollisionTests(geo, bounds, ref adjustment, translateTransform))
+            if (_currentWord == 0)
             {
-                var nextPosition = CalculateNextStartingPoint(adjustment);
+                SetupCollisionMap(textGeometry, ref bounds);
+                return geo;
+            }
 
-                bounds.X = nextPosition.X - halfGeoWidth;
-                bounds.Y = nextPosition.Y - halfGeoHeight;
+            var bitmap = GetPixels(textGeometry, ref bounds);
+            byte[] newBytes;
+            using (bitmap.GetBitmapContext(ReadWriteMode.ReadOnly))
+            {
+                newBytes = bitmap.ToByteArray();
+            }
 
-                translateTransform.X = bounds.X - initialPoint.X;
-                translateTransform.Y = bounds.Y - initialPoint.Y;
+            bounds.X = (Width - bounds.Width) / 2;
+            bounds.Y = (Height - bounds.Height) / 2;
+            while (PerformCollisionTests(newBytes, ref bounds, ref adjustment))
+            {
+                CalculateNextStartingPoint(ref bounds, adjustment);
             }
 
 
-            collide.Stop();
-            _previousCollidedWord = null;
-            geo.Freeze();
-            bounds = geo.Bounds;
-            //     boundingBox.GlobalLocation = bounds.Location;
-            //   boundingBox.Freeze();
-            _recQuadTree.Insert(geo, bounds);
+            translateTransform.X += bounds.X;
+            translateTransform.Y += bounds.Y;
+            UpdateMainImage(newBytes, bounds);
 
+            collide.Stop();
+            geo.Freeze();
             return geo;
         }
 
-        private readonly Dictionary<GeometryDrawing, WordCloudEntry> _wordGeoLookup = new Dictionary<GeometryDrawing, WordCloudEntry>();
-        private Dictionary<GeometryDrawing, WriteableBitmap> _bitmapCache = new Dictionary<GeometryDrawing, WriteableBitmap>();
-
-/*
-        private HierarchicalBoundingBox<GeometryDrawing> ChopWord(GeometryDrawing geo)
+        private void SetupCollisionMap(Geometry textGeometry, ref Rect bounds)
         {
-            var bb = new HierarchicalBoundingBox<GeometryDrawing>(geo);
-            _wordChops.Add(geo, bb);
-            return bb;
-        }
-*/
+            var center = new Point(Width / 2 - bounds.Width / 2, Height / 2 - bounds.Height / 2);
+            var centretransform = new TranslateTransform(center.X, center.Y);
 
-        private bool PerformCollisionTests(GeometryDrawing newGeometry, Rect bounds, ref double adjustment, Transform t)
-        {
-            if (_currentWord == 0)
-            {
-                _mainImageBitmap = GetPixels(newGeometry);
-            }
-            
-            if (_previousCollidedWord != null && adjustment > 0 && !Equals(newGeometry, _previousCollidedWord))
-            {
-                if (DoGeometricDrawingsCollide(newGeometry, _previousCollidedWord, bounds, ref adjustment, t)) return true;
-            }
-            //   var found = _recQuadTree.QueryLocation(bounds).Where(x => x != _previousCollidedWord).ToList();
-            var found = _wordGeoLookup.Keys.Where(x => !Equals(x, newGeometry)).ToList();
-            Debug.WriteLine("Placing: " + _wordGeoLookup[newGeometry].Word);
-            Debug.WriteLine("Found: " + string.Join(" ", found.Select((k, v) => _wordGeoLookup[k].Word)));
-            foreach (var existingGeometry in found)
-            {
-                Debug.WriteLine("Avoid: " + _wordGeoLookup[existingGeometry].Word);
+            var transformGroup = textGeometry.Transform as TransformGroup;
+            transformGroup?.Children.Add(centretransform);
 
-                if (DoGeometricDrawingsCollide(newGeometry, existingGeometry, bounds, ref adjustment, t))
-                {
-                    Debug.WriteLine("Hit: " + _wordGeoLookup[existingGeometry].Word);
+            bounds.Width = Width;
+            bounds.Height = Height;
 
-                    return true;
-                }
+            var mainImageBitmap = GetPixels(textGeometry, ref bounds);
+            byte[] mainImageBytes;
+            using (mainImageBitmap.GetBitmapContext(ReadWriteMode.ReadOnly))
+            {
+                mainImageBytes = mainImageBitmap.ToByteArray();
             }
-            return false;
+
+            var totalPixels = mainImageBytes.Length / Pbgra32Bytes;
+            _collisionMap = new bool[totalPixels];
+            _collisionMapWidth = mainImageBitmap.PixelWidth;
+            _collisionMapHeight = mainImageBitmap.PixelHeight;
+            for (var i = 0; i < totalPixels; ++i)
+            {
+                _collisionMap[i] = mainImageBytes[i * Pbgra32Bytes] != Pbgra32Alpha;
+            }
         }
 
-        private WriteableBitmap _mainImageBitmap;
-        
-        private bool DoGeometricDrawingsCollide(GeometryDrawing newGeo, GeometryDrawing existingGeo, Rect bounds, ref double adjustment, Transform t)
+        private bool PerformCollisionTests(IReadOnlyList<byte> newBytes, ref Rect bounds, ref double adjustment)
         {
-            bounds = newGeo.Bounds;
-            if (Equals(newGeo, existingGeo)) return true;
-            if (bounds.X < 0 || bounds.Y < 0 || bounds.Right > Width || bounds.Top > Height)
+            if (bounds.Y + bounds.Height > _collisionMapHeight ||
+                bounds.X + bounds.Width > _collisionMapWidth ||
+                bounds.X + bounds.Width < 0 ||
+                bounds.Y + bounds.Height < 0)
             {
-                _previousCollidedWord = null;
-                adjustment = 1.0;
+                adjustment = 0.0;
+
                 return true;
             }
-            //   _wordChops[newGeo].GlobalLocation = bounds.Location;
-            // var bbTest = newGeo.FillContainsWithDetail(existingGeo) != IntersectionDetail.Empty;
-            //      var bbTest = _wordChops[existingGeo].DoBoxesCollide(_wordChops[newGeo]);
 
-            var pixel = _mainImageBitmap.Crop(bounds);
-            var pixel2 = GetPixels(newGeo).Crop(bounds);
+            adjustment += 1;
 
-            int index = 0;
-           pixel.ForEach((x,y,color) =>
-           {
-               if (pixel2.GetPixel(x, y).A == color.A)
-               {
-                   
-               }
-           });
-            
-           
+            var srcWidth = _collisionMapWidth;
+            var testBoundary = bounds;
+            var testX = (int) testBoundary.X;
+            var testY = (int) testBoundary.Y;
+            var testWidth = (int) testBoundary.Width;
+            var testHeight = (int) testBoundary.Height;
+
+            for (var line = 0; line < testHeight; ++line)
+            {
+                var mapPosition = (testY + line) * srcWidth + testX;
+                var testOffest = line * testWidth * Pbgra32Bytes;
+
+                for (var i = 0; i < testWidth; ++i)
+                {
+                    if (_collisionMap[mapPosition + i] && newBytes[testOffest + i] != Pbgra32Alpha) return true;
+                }
+            }
+
             return false;
         }
 
-        private WriteableBitmap GetPixels(GeometryDrawing existingGeo)
+        private void UpdateMainImage(IReadOnlyList<byte> newBytes, Rect copyRectangle)
         {
-            var bm = new RenderTargetBitmap((int) Width, (int) Height, DpiScale.PixelsPerInchX, DpiScale.PixelsPerInchY, PixelFormats.Pbgra32);
+            if (copyRectangle.Y + copyRectangle.Height > _collisionMapHeight ||
+                copyRectangle.X + copyRectangle.Width > _collisionMapWidth ||
+                copyRectangle.X + copyRectangle.Width < 0 ||
+                copyRectangle.Y + copyRectangle.Height < 0)
+            {
+                throw new IndexOutOfRangeException("Image copyRectangle are out of range");
+            }
+
+            var srcWidth = _collisionMapWidth;
+            var testX = (int) copyRectangle.X;
+            var testY = (int) copyRectangle.Y;
+            var testWidth = (int) copyRectangle.Width;
+            var testHeight = (int) copyRectangle.Height;
+
+            for (var line = 0; line < testHeight; ++line)
+            {
+                var mapPosition = (testY + line) * srcWidth + testX;
+                var testOffest = line * testWidth * Pbgra32Bytes;
+
+                for (var i = 0; i < testWidth; ++i)
+                {
+                    if (newBytes[testOffest + i] > Pbgra32Alpha) _collisionMap[mapPosition + i] = true;
+                }
+            }
+        }
+
+        private Point _currentCenter;
+        private bool[] _collisionMap;
+        private int _collisionMapWidth;
+        private int _collisionMapHeight;
+
+        private WriteableBitmap GetPixels(Geometry existingGeo, ref Rect bounds)
+        {
+            bounds.Width += 2;
+            bounds.Height += 2;
+            var bm = new RenderTargetBitmap((int) bounds.Width, (int) bounds.Height, 96, 96, _pixelFormat);
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawDrawing(existingGeo);
+                dc.DrawGeometry(Brushes.Black, null, existingGeo);
             }
-            bm.Render(dv);
-            
-            var wbmp = new WriteableBitmap(bm);
-            
 
-            return wbmp;
+            bm.Render(dv);
+
+            return new WriteableBitmap(bm);
+        }
+
+        public bool Intersect(ref Rect rect1, ref Rect rect2)
+        {
+            if (rect2.IsEmpty || rect1.IsEmpty || rect1.Left > rect2.Right || rect1.Right < rect2.Left || rect1.Top > rect2.Bottom || rect1.Bottom >= rect2.Top)
+            {
+                rect1 = Rect.Empty;
+                return false;
+            }
+
+            var num1 = Math.Max(rect1.Left, rect2.Left);
+            var num2 = Math.Max(rect1.Top, rect2.Top);
+            rect1.Width = Math.Max(Math.Min(rect1.Right, rect2.Right) - num1, 0.0);
+            rect1.Height = Math.Max(Math.Min(rect1.Bottom, rect2.Bottom) - num2, 0.0);
+            rect1.X = num1;
+            rect1.Y = num2;
+            return true;
         }
 
         private void PopulateWordList(WordCloudData wordCloudData)

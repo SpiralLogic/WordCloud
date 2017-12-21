@@ -61,6 +61,7 @@
     </ApplicationDefinition>
     <Compile Include="Bitmap\BitmapBase.cs" />
     <Compile Include="Bitmap\BitmapContext.cs" />
+    <Compile Include="Bitmap\BitmapConversion.cs" />
     <Compile Include="Bitmap\BitmapExtensions.cs" />
     <Compile Include="Bitmap\BitmapFactory.cs" />
     <Compile Include="Bitmap\BitmapTransformation.cs" />
