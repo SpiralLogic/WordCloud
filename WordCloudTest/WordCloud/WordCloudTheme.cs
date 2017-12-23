@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Windows;
 using System.Windows.Media;
 
 namespace WordCloudTest.WordClouds
@@ -9,7 +8,7 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Initializes a new instance of the <see cref="WordCloudTheme"/> class.
         /// </summary>
-        public WordCloudTheme(Typeface typeFace, FontWeight fontWeight, WordCloudThemeWordRotation wordRotation, List<Color> colorList, Color backgroundColor)
+        public WordCloudTheme(Typeface typeFace,  WordCloudThemeWordRotation wordRotation, List<SolidColorBrush> colorList, SolidColorBrush backgroundColor)
         {
             Typeface = typeFace;
             WordRotation = wordRotation;
@@ -29,8 +28,6 @@ namespace WordCloudTest.WordClouds
             set;
         }
 
-       public FontWeight FontWeight { get; set; }
-
         /// <summary>
         /// Gets or sets the word rotation.
         /// </summary>
@@ -49,7 +46,7 @@ namespace WordCloudTest.WordClouds
         /// <value>
         /// The color list.
         /// </value>
-        public List<Color> ColorList
+        public List<SolidColorBrush> ColorList
         {
             get;
             set;
@@ -61,7 +58,7 @@ namespace WordCloudTest.WordClouds
         /// <value>
         /// The color of the background.
         /// </value>
-        public Color BackgroundColor
+        public SolidColorBrush BackgroundColor
         {
             get;
             set;

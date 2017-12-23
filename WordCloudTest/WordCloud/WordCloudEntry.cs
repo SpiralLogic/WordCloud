@@ -19,7 +19,7 @@ namespace WordCloudTest.WordClouds
         /// <value>
         /// The color.
         /// </value>
-        public Color Color { get; set; }
+        public SolidColorBrush Color { get; set; }
 
         /// <summary>
         /// Gets or sets the alpha value
