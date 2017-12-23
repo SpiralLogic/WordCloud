@@ -61,6 +61,7 @@ namespace WordCloudTest.Views
         {
             _cloudWidth = Width - 4;
             _cloudHeight = Height - 4;
+            _centre = new Point(_cloudWidth / 2, _cloudHeight / 2);
             _minWordWeight = _words.Min(e => e.wordWeight);
             _mainDrawingGroup.Children.Clear();
             _fontMultiplier = GetFontMultiplier();
@@ -72,13 +73,13 @@ namespace WordCloudTest.Views
 
             using (var context = _bgDrawingGroup.Open())
             {
-                context.DrawRectangle(Brushes.Black, null, new Rect(0, 0, Width, Height));
+                context.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, Width, Height));
             }
 
             _bgDrawingGroup.Freeze();
             _mainDrawingGroup.Children.Add(_bgDrawingGroup);
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
-            //    _mainDrawingGroup.Children.Add(_debugDrawingGroup);
+            _mainDrawingGroup.Children.Add(_debugDrawingGroup);
         }
 
         public void AddWord()
@@ -93,17 +94,18 @@ namespace WordCloudTest.Views
 
             _currentWord++;
 
-            _mainDrawingGroup.Children.Clear();
-            _mainDrawingGroup.Children.Add(_wordDrawingGroup);
-            var finalTransformGroup = new TransformGroup();
-            _wordDrawingGroup.Transform = finalTransformGroup;
-
-            if (_wordDrawingGroup.Bounds.Width > _cloudWidth || _wordDrawingGroup.Bounds.Height > _cloudHeight)
-            {
-                finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, BaseImage.RenderSize.Width / 2, BaseImage.RenderSize.Height / 2));
-            }
-
-            finalTransformGroup.Children.Add(new TranslateTransform(-(Width - _wordDrawingGroup.Bounds.Width) / 2, -(Height - _wordDrawingGroup.Bounds.Height) / 2));
+            /*       _mainDrawingGroup.Children.Clear();
+                   _mainDrawingGroup.Children.Add(_wordDrawingGroup);
+                   var finalTransformGroup = new TransformGroup();
+                   _wordDrawingGroup.Transform = finalTransformGroup;
+       
+                   if (_wordDrawingGroup.Bounds.Width > _cloudWidth || _wordDrawingGroup.Bounds.Height > _cloudHeight)
+                   {
+                       finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, BaseImage.RenderSize.Width / 2, BaseImage.RenderSize.Height / 2));
+                   }
+       
+                   finalTransformGroup.Children.Add(new TranslateTransform(-(Width - _wordDrawingGroup.Bounds.Width) / 2, -(Height - _wordDrawingGroup.Bounds.Height) / 2));
+            */
         }
 
         public void AddWords()
@@ -116,25 +118,32 @@ namespace WordCloudTest.Views
                 {
                     _wordDrawingGroup.Children.Add(geo);
                 }
+                else
+                {
+                    break;
+
+                }
 
                 _currentWord++;
             }
-
-            _mainDrawingGroup.Children.Remove(_wordDrawingGroup);
+            using (var c = _debugDrawingGroup.Append())
+            {
+                c.DrawEllipse(Brushes.Purple, null, new Point(_centre.X, _centre.Y), 5, 5);
+            }
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
-            var finalTransformGroup = new TransformGroup();
-            _wordDrawingGroup.Transform = finalTransformGroup;
-            var wordGroupBounds = _wordDrawingGroup.Bounds;
-            if (wordGroupBounds.Width + Buffer > Width || wordGroupBounds.Height + Buffer > Height)
-            {
-                finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, Width / 2, Height / 2));
-            }
-            else
-            {
-                finalTransformGroup.Children.Add(new TranslateTransform(Width / 2 - wordGroupBounds.Width / 2 - wordGroupBounds.X, Height / 2 - wordGroupBounds.Height / 2 - wordGroupBounds.Y));
-                BaseImage.Stretch = Stretch.Uniform;
-            }
-
+            /*    var finalTransformGroup = new TransformGroup();
+                _wordDrawingGroup.Transform = finalTransformGroup;
+                var wordGroupBounds = _wordDrawingGroup.Bounds;
+                if (wordGroupBounds.Width + Buffer > Width || wordGroupBounds.Height + Buffer > Height)
+                {
+                    finalTransformGroup.Children.Add(new ScaleTransform(.95, .95, Width / 2, Height / 2));
+                }
+                else
+                {
+                    finalTransformGroup.Children.Add(new TranslateTransform(Width / 2 - wordGroupBounds.Width / 2 - wordGroupBounds.X, Height / 2 - wordGroupBounds.Height / 2 - wordGroupBounds.Y));
+                    BaseImage.Stretch = Stretch.Uniform;
+                }
+    */
             _currentWord = 0;
         }
 
@@ -166,10 +175,15 @@ namespace WordCloudTest.Views
 
         private DrawingGroup _debugDrawingGroup = new DrawingGroup();
         private DrawingGroup _bgDrawingGroup;
+        private double _flip=1;
 
         private bool CalculateNextStartingPoint(WordGeo wordGeo)
         {
-            if (_spiralMode && SpiralPoint(wordGeo)) return true;
+            if (_spiralMode && SpiralPoint(wordGeo))
+            {
+              
+                return true;
+            }
 
             _spiralMode = false;
 
@@ -179,52 +193,38 @@ namespace WordCloudTest.Views
             return false;
         }
 
-        private void DrawDebugPoint(WordGeo wordGeo, SolidColorBrush brush)
+        private void DrawDebugPoint(Point point, SolidColorBrush brush)
         {
             using (var c = _debugDrawingGroup.Append())
             {
-                c.DrawEllipse(brush, null, new Point(wordGeo.X, wordGeo.Y), 3, 3);
+                c.DrawEllipse(brush, null, new Point(point.X, point.Y), 3, 3);
             }
         }
 
         private bool SpiralPoint(WordGeo wordGeo)
         {
-            _adjustment += WordCloudConstants.DoublePi / 50;
-
-            while (_adjustment < WordCloudConstants.MaxSprialLength && IsOutOfBounds(wordGeo))
-            {
-                _adjustment += WordCloudConstants.DoublePi;
-            }
-
-            if (_adjustment > 2*WordCloudConstants.MaxSprialLength)
-            {
-                return false;
-            }
+            var k =5;
+            wordGeo.X += _flip*(Math.Sqrt(k * _adjustment) * Math.Cos(Math.Sqrt(k * _adjustment)))  ;
+            wordGeo.Y += _flip * (Math.Sqrt(k * _adjustment) * Math.Sin(Math.Sqrt(k * _adjustment)));
 
 
-            var multi = _adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
-            var angle = _adjustment % WordCloudConstants.DoublePi;
-
-            wordGeo.X = _cloudWidth / 2 + multi * -Math.Sin(angle) - _centre.X;
-            wordGeo.Y = _cloudHeight / 2 + multi * -Math.Cos(angle) - _centre.Y;
-
-            if (wordGeo.Right > _cloudWidth || wordGeo.Bottom > _cloudHeight || wordGeo.X < 0 || wordGeo.Y < 0)
-            {
-                var count = 0;
-                if (wordGeo.Right > _cloudWidth) count++;
-                if (wordGeo.Bottom > _cloudHeight) count++;
-                if (wordGeo.X < 0) count++;
-                if (wordGeo.Y < 0) count++;
-
-                if (count > 1) return false;
-
-
-                multi = _adjustment / WordCloudConstants.DoublePi * WordCloudConstants.SpiralRadius;
-                angle = _adjustment % WordCloudConstants.DoublePi;
-
-                wordGeo.X = _cloudWidth / 2 + multi * -Math.Sin(angle) - _centre.X;
-                wordGeo.Y = _cloudHeight / 2 + multi * -Math.Cos(angle) - _centre.Y;
-            }
+            _adjustment++;
+            /*      if (wordGeo.Right > _cloudWidth || wordGeo.Bottom > _cloudHeight || wordGeo.X < 0 || wordGeo.Y < 0)
+                  {
+                      var count = 0;
+                      if (wordGeo.Right > _cloudWidth) count++;
+                      if (wordGeo.Bottom > _cloudHeight) count++;
+                      if (wordGeo.X < 0) count++;
+                      if (wordGeo.Y < 0) count++;
+      
+                      if (count > 1) return false;
+      
+                      _centre.X = _lastPlacedBounds.X + _cloudWidth / 2 * (_lastPlacedBounds.X > _cloudWidth / 2 ? -1 : 1);
+                      _centre.Y = _lastPlacedBounds.Y + _cloudHeight / 2 * (_lastPlacedBounds.Y > _cloudHeight / 2 ? -1 : 1);
+                      _adjustment = 1;
+                      wordGeo.X = _cloudWidth / 2 - wordGeo.Width  * Math.Sqrt(k * _adjustment) * Math.Cos(Math.Sqrt(k * _adjustment)) + _centre.X;
+                      wordGeo.Y = _cloudHeight / 2 - wordGeo.Height  * Math.Sqrt(k * _adjustment) * Math.Sin(Math.Sqrt(k * _adjustment)) + _centre.Y;
+                  }*/
 
             return true;
         }
@@ -232,7 +232,9 @@ namespace WordCloudTest.Views
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
         {
+            _flip *= -1;
             _debugDrawingGroup.Children.Clear();
+
             var text = new FormattedText(word.Word,
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
@@ -240,48 +242,70 @@ namespace WordCloudTest.Views
                 GetFontSize(word.wordWeight),
                 word.Color,
                 DpiScale.PixelsPerDip);
-            var textGeometry = text.BuildGeometry(new Point(0, 0));
 
+            var textGeometry = text.BuildGeometry(new Point(0, 0));
             var wordGeo = new WordGeo(textGeometry, word);
 
             if (_collisionMap == null)
             {
                 CreateCollisionMap(wordGeo);
+
                 return wordGeo.GetDrawing();
             }
 
             var newBytes = GetPixels(wordGeo, wordGeo.IntWidth, wordGeo.IntHeight);
-
-            wordGeo.X = (_cloudWidth - wordGeo.Width) / 2;
-            wordGeo.Y = (_cloudHeight - wordGeo.Height) / 2;
-
+            wordGeo.X += _centre.X - wordGeo.Center.X;
+            wordGeo.Y += _centre.Y - wordGeo.Center.Y;
             _spiralMode = true;
             _adjustment = 1;
-            //DrawDebugPoint(newWord, Brushes.Blue);
+            DrawDebugPoint(new Point(wordGeo.X, wordGeo.Y), Brushes.Blue);
 
             while (HasCollision(newBytes, wordGeo))
             {
+                DrawDebugPoint(new Point(wordGeo.X + wordGeo.Center.X, wordGeo.Y + wordGeo.Center.Y), Brushes.Black);
+
                 if (!CalculateNextStartingPoint(wordGeo) || IsOutOfBounds(wordGeo))
                 {
-                    Debug.WriteLine("Failed: " + wordGeo);
                     return null;
                 }
             }
-            //DrawDebugPoint(newWord, Brushes.Red);
+            AdjustFinalPosition(newBytes, wordGeo);
+
+
+            DrawDebugPoint(new Point(wordGeo.X , wordGeo.Y ), Brushes.Red);
 
             UpdateCollisionMap(newBytes, wordGeo);
             return wordGeo.GetDrawing();
         }
 
-        private void CreateCollisionMap(WordGeo textGeometry)
+        private void AdjustFinalPosition(byte[] newBytes, WordGeo wordGeo)
         {
-            textGeometry.Translate(_cloudWidth / 2 - textGeometry.Width / 2, _cloudHeight / 2 - textGeometry.Height / 2);
+            var previousX = wordGeo.X;
+            while (!HasCollision(newBytes, wordGeo) && Math.Abs(_centre.X - wordGeo.X) > Buffer*3)
+            {
+                previousX = wordGeo.X;
+                wordGeo.X += wordGeo.X > _centre.X ? -Buffer*3 : Buffer*3;
+            }
+            wordGeo.X = previousX;
 
+            var previousY = wordGeo.Y;
+            while (!HasCollision(newBytes, wordGeo) && Math.Abs(_centre.Y - wordGeo.Y) > Buffer*3)
+            {
+                previousY = wordGeo.Y;
+                wordGeo.Y += wordGeo.Y > _centre.Y ? -Buffer*3 : Buffer*3;
+            }
+            wordGeo.Y = previousY;
+        }
+
+        private void CreateCollisionMap(WordGeo wordGeo)
+        {
+            wordGeo.X += _centre.X - wordGeo.Center.X;
+            wordGeo.Y += _centre.Y - wordGeo.Center.Y;
             _collisionMapWidth = (int) _cloudWidth;
             _collisionMapHeight = (int) _cloudHeight;
 
 
-            var mainImageBytes = GetPixels(textGeometry, _collisionMapWidth, _collisionMapHeight);
+            var mainImageBytes = GetPixels(wordGeo, _collisionMapWidth, _collisionMapHeight);
             var totalPixels = _collisionMapHeight * _collisionMapWidth;
 
             _collisionMap = new BitArray(totalPixels);
@@ -292,16 +316,19 @@ namespace WordCloudTest.Views
             }
         }
 
-        private void AddNewCollisionPoint(int i)
+        private void AddNewCollisionPoint(int index)
         {
-            var y = i / _collisionMapWidth;
-            var x = i % _collisionMapWidth;
-            _collisionMap[i] = true;
+            var y = index / _collisionMapWidth;
+            var x = index % _collisionMapWidth;
+            _collisionMap[index] = true;
 
-            if (x < _collisionMapWidth) _collisionMap[i] = true;
-            if (y < _collisionMapHeight) _collisionMap[i + _collisionMapHeight] = true;
-            if (x > 0) _collisionMap[i] = true;
-            if (y > 0) _collisionMap[i - _collisionMapHeight] = true;
+            for (var i = 1; i <= Buffer; i++)
+            {
+                if (x < _collisionMapWidth - i) _collisionMap[index + i] = true;
+                if (y < _collisionMapHeight - i) _collisionMap[index + _collisionMapWidth * i] = true;
+                if (x > i - 1) _collisionMap[index - i] = true;
+                if (y > i - 1) _collisionMap[index - _collisionMapWidth * i] = true;
+            }
         }
 
         private bool HasCollision(IReadOnlyList<byte> newWordBytes, WordGeo newWord)
@@ -332,7 +359,7 @@ namespace WordCloudTest.Views
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsOutOfBounds(WordGeo wordGeo)
         {
-            return (wordGeo.Right > _cloudWidth || wordGeo.Bottom > _cloudHeight || wordGeo.X < 0 || wordGeo.Y < 0);
+            return wordGeo.Right > _cloudWidth || wordGeo.Bottom > _cloudHeight || wordGeo.X < 0 || wordGeo.Y < 0;
         }
 
         private void UpdateCollisionMap(IReadOnlyList<byte> newBytes, WordGeo wordGeo)
@@ -365,13 +392,13 @@ namespace WordCloudTest.Views
             }
         }
 
-        private byte[] GetPixels(WordGeo existingGeo, int width, int height)
+        private byte[] GetPixels(WordGeo wordGeo, int width, int height)
         {
             var bm = new RenderTargetBitmap(width, height, 96, 96, _pixelFormat);
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawGeometry(Brushes.Purple, new Pen(Brushes.Purple, 10), existingGeo.Geo);
+                dc.DrawGeometry(Brushes.Purple, new Pen(Brushes.Purple, 10), wordGeo.Geo);
             }
             bm.Render(dv);
 
@@ -502,11 +529,13 @@ namespace WordCloudTest.Views
 
             _geo.Transform = _transformGroup;
 
-            var rotateTransform = new RotateTransform(_wordEntry.Angle, _bounds.Width / 2, _bounds.Height / 2);
+            Center = new Point(_bounds.Width / 2, _bounds.Height / 2);
+            var rotateTransform = new RotateTransform(_wordEntry.Angle, Center.X, Center.Y);
             _transformGroup.Children.Add(rotateTransform);
             _bounds = rotateTransform.TransformBounds(_bounds);
 
             _transformGroup.Children.Add(new TranslateTransform(-_bounds.X, -_bounds.Y));
+
             _bounds.X = 0;
             _bounds.Y = 0;
 
@@ -535,21 +564,18 @@ namespace WordCloudTest.Views
             set => _bounds.Y = value;
         }
 
-        public double Bottom => _bounds.Bottom;
-        public double Right => _bounds.Right;
+        public double Bottom => _bounds.Y + Height;
+        public double Right => _bounds.X + Width;
 
         public double Width => _bounds.Width;
         public double Height => _bounds.Height;
+
+        public Point Center { get; }
+
         public int IntWidth => (int) Math.Ceiling(_bounds.Width);
         public int IntHeight => (int) Math.Ceiling(_bounds.Height);
         public int IntX => (int) Math.Ceiling(_bounds.X);
         public int IntY => (int) Math.Ceiling(_bounds.Y);
-
-        public void Translate(double x, double y)
-        {
-            _bounds.X += x;
-            _bounds.Y += y;
-        }
 
         public GeometryDrawing GetDrawing()
         {
@@ -558,6 +584,7 @@ namespace WordCloudTest.Views
                 Geometry = _geo,
                 Brush = _wordEntry.Color,
             };
+
             _translateTransform.X = _bounds.X;
             _translateTransform.Y = _bounds.Y;
 
