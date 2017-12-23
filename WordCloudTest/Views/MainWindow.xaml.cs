@@ -57,7 +57,7 @@ namespace WordCloudTest
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 10000},
+            {"coding", 100000},
             {"windows", 9990},
             {"wawa", 9980},
             {"mac", 9970},
