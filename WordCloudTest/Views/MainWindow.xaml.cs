@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -37,12 +38,28 @@ namespace WordCloudTest
 
         private void AddWord(object sender, RoutedEventArgs e)
         {
-            WordcloudControl.DoStuff(_wordcloudControlDataContext);
+            WordcloudControl.AddWord(_wordcloudControlDataContext);
+            Failures.Text = WordcloudControl.Failures.ToString();
+            X.Text = WordcloudControl.LastAddedBounds.X.ToString();
+            Y.Text = WordcloudControl.LastAddedBounds.Y.ToString();
+            W.Text = WordcloudControl.LastAddedBounds.Width.ToString();
+            H.Text = WordcloudControl.LastAddedBounds.Height.ToString();
         }
 
         private void DoWordCloud(object sender, RoutedEventArgs e)
         {
-            WordcloudControl.RestartCloud(_wordcloudControlDataContext);
+            var s = new Stopwatch();
+            s.Start();
+
+            WordcloudControl.AddWords(_wordcloudControlDataContext);
+            s.Stop();
+            Time.Text = s.ElapsedMilliseconds.ToString();
+            Failures.Text = WordcloudControl.Failures.ToString();
+            X.Text = WordcloudControl.LastAddedBounds.X.ToString();
+            Y.Text = WordcloudControl.LastAddedBounds.Y.ToString();
+            W.Text = WordcloudControl.LastAddedBounds.Width.ToString();
+            H.Text = WordcloudControl.LastAddedBounds.Height.ToString();
+            Debug.WriteLine(s.ElapsedMilliseconds);
         }
 
         public WordCloudData WordCloudData
@@ -57,7 +74,7 @@ namespace WordCloudTest
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 10000000},
+            {"coding", 100000},
             {"windows", 99000},
             {"wawa", 9980},
             {"mac", 9970},
