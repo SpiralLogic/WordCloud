@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -19,7 +21,7 @@ namespace WordCloudTest.Views
     /// </summary>
     public partial class WordCloud2
     {
-        private const int MaxWords = 300;
+        private const int MaxWords = 600;
 
         private int _currentWord;
         private int _minWordWeight;
@@ -51,10 +53,9 @@ namespace WordCloudTest.Views
         }
 
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Interpris;
-        public Rect LastAddedBounds { get; private set; }
         public int Failures => _cloudSpace.FailedPlacements;
-        
-            private void Setup()
+
+        private void Setup()
         {
             _cloudSpace = new CloudSpace(Width - 4, Height - 4, _randomizer);
 
@@ -73,15 +74,15 @@ namespace WordCloudTest.Views
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
         }
 
-        private void AddWordInternal()
+        private async Task AddWordInternal()
         {
             var word = _words[_currentWord];
-            var wordGeometry = CreateWordGeometry(word);
 
-            if (wordGeometry != null)
+            var geo = CreateWordGeometry(word);
+
+            if (geo != null)
             {
-                _wordDrawingGroup.Children.Add(wordGeometry);
-                    LastAddedBounds = wordGeometry.Bounds;
+                _wordDrawingGroup.Children.Add(geo);
             }
 
             _currentWord++;
@@ -92,19 +93,34 @@ namespace WordCloudTest.Views
             RecenterFinishedWordGroup();
         }
 
-        private void AddWordsInternal()
+        private async Task AddWordsInternal()
         {
-            foreach (var word in _words)
+            var geoList = new BlockingCollection<Drawing>();
+            var addTask = Task.Run(() =>
             {
-                var geo = CreateWordGeometry(word);
-
-                if (geo != null)
+                foreach (var word in _words)
                 {
-                    _wordDrawingGroup.Children.Add(geo);
-                    LastAddedBounds = geo.Bounds;
+                    var geo = CreateWordGeometry(word);
+
+                    if (geo != null)
+                    {
+                        geoList.Add(geo);
+                    }
+                    _currentWord++;
                 }
-                _currentWord++;
-            }
+                geoList.CompleteAdding();
+            });
+            var displayTask = Task.Run(() =>
+            {
+                while (!geoList.IsAddingCompleted || geoList.Count > 0)
+                {
+                    var add = geoList.Take();
+                    Dispatcher.InvokeAsync(() => { _wordDrawingGroup.Children.Add(add); });
+                }
+            });
+
+            await Task.WhenAll(addTask, displayTask);
+            geoList.Dispose();
 
             _mainDrawingGroup.Children.Remove(_bgDrawingGroup);
 
@@ -129,9 +145,34 @@ namespace WordCloudTest.Views
                 finalTransformGroup.Children.Add(new TranslateTransform((Width - wordGroupBounds.Width) / 2 - wordGroupBounds.X, (Height - wordGroupBounds.Height) / 2 - wordGroupBounds.Y));
                 BaseImage.Stretch = Stretch.Uniform;
             }
+
+            // AddCollisionDebug();
         }
 
-        public void AddWord(WordCloudData wordCloudData)
+        private void AddCollisionDebug()
+        {
+            var dg = new DrawingGroup();
+            using (var c = dg.Open())
+            {
+                for (var y = 0; y < _cloudSpace._collisionMapHeight; y++)
+                {
+                    for (var x = 0; x < _cloudSpace._collisionMapWidth; x++)
+                    {
+                        if (_cloudSpace._collisionMap[x + y * _cloudSpace._collisionMapWidth])
+                        {
+                            c.DrawEllipse(Brushes.Purple, null, new Point(x, y), 1, 1);
+                        }
+                    }
+                }
+                foreach (var rect in _cloudSpace._collisionRects)
+                {
+                    c.DrawRectangle(null, new Pen(Brushes.Red, 1), rect);
+                }
+            }
+            _mainDrawingGroup.Children.Add(dg);
+        }
+
+        public async Task AddWord(WordCloudData wordCloudData)
         {
             if (_currentWord == _words.Count)
             {
@@ -143,14 +184,14 @@ namespace WordCloudTest.Views
                 Setup();
             }
 
-            AddWordInternal();
+            await AddWordInternal();
         }
 
-        public void AddWords(WordCloudData wordCloudData)
+        public async Task AddWords(WordCloudData wordCloudData)
         {
             PopulateWordList(wordCloudData);
-            Setup();
-            AddWordsInternal();
+            if (_cloudSpace == null) Setup();
+            await AddWordsInternal();
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -166,31 +207,9 @@ namespace WordCloudTest.Views
             var textGeometry = text.BuildGeometry(new Point(0, 0));
             var wordGeo = new WordGeo(textGeometry, word);
 
-            
-            return _cloudSpace.AddWordGeometry(wordGeo) ? wordGeo.GetDrawing(): null;
+
+            return _cloudSpace.AddWordGeometry(wordGeo) ? wordGeo.GetDrawing() : null;
         }
-
-
-/*
-        private void AdjustFinalPosition(byte[] newBytes, WordGeo wordGeo)
-        {
-            var previousX = wordGeo.X;
-            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.X - wordGeo.X) > Buffer * 3)
-            {
-                previousX = wordGeo.X;
-                wordGeo.X += wordGeo.X > CloudCenter.X ? -Buffer * 3 : Buffer * 3;
-            }
-            wordGeo.X = previousX;
-
-            var previousY = wordGeo.Y;
-            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.Y - wordGeo.Y) > Buffer * 3)
-            {
-                previousY = wordGeo.Y;
-                wordGeo.Y += wordGeo.Y > CloudCenter.Y ? -Buffer * 3 : Buffer * 3;
-            }
-            wordGeo.Y = previousY;
-        }
-*/
 
 
         private void PopulateWordList(WordCloudData wordCloudData)
@@ -349,8 +368,6 @@ namespace WordCloudTest.Views
         public int IntBottom => IntY + IntHeight;
         public int IntRight => IntX + IntWidth;
 
-        public Point Start;
-
         public GeometryDrawing GetDrawing()
         {
             var geoDrawing = new GeometryDrawing
@@ -416,26 +433,25 @@ namespace WordCloudTest.Views
 
     class CloudSpace
     {
-        private const StartPosition DefaultStartingPosition = StartPosition.Center;
+        private StartPosition DefaultStartingPosition = StartPosition.Center;
 
         private readonly PixelFormat _pixelFormat = PixelFormats.Pbgra32;
         private readonly IRandomizer _randomizer;
         private readonly IPositioner _positioner;
 
-        private int RepositionAttempts = 10;
+        private int RepositionAttempts = 4;
         private const int Pbgra32Bytes = 4;
         private const int Pbgra32Alpha = 0;
         public double Width { get; }
         public double Height { get; }
         public Point CloudCenter;
 
-        private BitArray _collisionMap;
-        private int _collisionMapWidth;
+        public BitArray _collisionMap;
+        public int _collisionMapWidth;
 
-        private int _collisionMapHeight;
+        public int _collisionMapHeight;
+        public List<Rect> _collisionRects = new List<Rect>();
         public int FailedPlacements { get; private set; } = 0;
-
-        //  private Rect _lastPlacedBounds;
 
         private const int Buffer = 2;
 
@@ -456,11 +472,31 @@ namespace WordCloudTest.Views
         private bool CalculateNextStartingPoint(WordGeo wordGeo)
         {
             if (!_positioner.GetNextPoint(out var x, out var y)) return false;
-            
+
             wordGeo.X = x;
             wordGeo.Y = y;
 
             return true;
+        }
+
+
+        private void AdjustFinalPosition(byte[] newBytes, WordGeo wordGeo)
+        {
+            var previousX = wordGeo.X;
+            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.X - wordGeo.X) > Buffer * 3)
+            {
+                previousX = wordGeo.X;
+                wordGeo.X += wordGeo.X > CloudCenter.X ? -Buffer * 3 : Buffer * 3;
+            }
+            wordGeo.X = previousX;
+
+            var previousY = wordGeo.Y;
+            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.Y - wordGeo.Y) > Buffer * 3)
+            {
+                previousY = wordGeo.Y;
+                wordGeo.Y += wordGeo.Y > CloudCenter.Y ? -Buffer * 3 : Buffer * 3;
+            }
+            wordGeo.Y = previousY;
         }
 
 
@@ -552,7 +588,7 @@ namespace WordCloudTest.Views
                 testOffset += testWidth;
                 mapPosition += mapWidth;
             }
-
+            _collisionRects.Add(new Rect(testX, testY, testWidth, testHeight));
             return false;
         }
 
@@ -629,12 +665,14 @@ namespace WordCloudTest.Views
                         FailedPlacements++;
                         return false;
                     }
-
+                    DefaultStartingPosition = StartPosition.Random;
                     SetStartingPosition(wordGeo, StartPosition.Random);
                     attempts++;
                 }
             }
-            //      AdjustFinalPosition(newBytes, wordGeo);
+
+            if (DefaultStartingPosition == StartPosition.Random)
+                AdjustFinalPosition(newBytes, wordGeo);
 
             UpdateCollisionMap(newBytes, wordGeo);
 

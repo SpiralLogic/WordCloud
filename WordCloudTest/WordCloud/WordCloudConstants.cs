@@ -25,7 +25,7 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Minimum font size
         /// </summary>
-        public const int MinFontSize = 15;
+        public const int MinFontSize = 8;
 
         /// <summary>
         /// Minimum largest value
@@ -43,11 +43,6 @@ namespace WordCloudTest.WordClouds
         public const int MinimumLargestWordLength = 4;
 
         /// <summary>
-        /// Source bitmap margin to avoid clipping
-        /// </summary>
-        public const int Margin = 20;
-
-        /// <summary>
         /// Margin for vertical cropping - increase this to increase the amount of top & bottom whitespace
         /// around word cloud
         /// </summary>
@@ -58,20 +53,7 @@ namespace WordCloudTest.WordClouds
         /// </summary>
         public const double TargetWidthFactor = 2.7;
 
-        /// <summary>
-        /// Length to travel along the spiral before ending search
-        /// </summary>
-        public const double MaxSprialLength = DoublePi * 5800;
 
-        /// <summary>
-        /// The fixed limit of top words for WordCloud
-        /// </summary>
-        public const int MaxTopwordsCount = 100;
-
-        /// <summary>
-        /// The offset start location for print preview
-        /// </summary>
-        public const int LocationOffset = 30;
 
         /// <summary>
         /// Non-rotated word angle

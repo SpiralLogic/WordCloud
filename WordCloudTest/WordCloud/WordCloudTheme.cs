@@ -14,6 +14,11 @@ namespace WordCloudTest.WordClouds
             WordRotation = wordRotation;
             ColorList = colorList;
             BackgroundColor = backgroundColor;
+
+            foreach (var colour in ColorList)
+            {
+                colour.Freeze();
+            }
         }
 
         /// <summary>

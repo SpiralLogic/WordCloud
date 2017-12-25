@@ -5,16 +5,12 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WordCloudTest.Views"
         mc:Ignorable="d"
-        Title="MainWindow" Height="1100" Width="1500" BorderThickness="0">
+        Title="MainWindow" Height="1300" Width="1500" BorderThickness="0">
     <StackPanel>
-        <local:WordCloud2 DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="800" Width="1000"></local:WordCloud2>
+        <local:WordCloud2 DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="1100" Width="1000"></local:WordCloud2>
         <Button Click="AddWord" Content="add"></Button>
         <Button Click="DoWordCloud" Content="do"></Button>
         <TextBlock Name="Time"></TextBlock>
         <TextBlock Name="Failures"></TextBlock>
-        <TextBlock Name="X"></TextBlock>
-        <TextBlock Name="Y"></TextBlock>
-        <TextBlock Name="W"></TextBlock>
-        <TextBlock Name="H"></TextBlock>
     </StackPanel>
 </Window>

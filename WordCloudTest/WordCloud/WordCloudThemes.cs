@@ -54,24 +54,23 @@ namespace WordCloudTest.WordCloud
             catch
             {
                 //segoeUI = DefaultFont;
-
             }
 
             // Interpris
-            Interpris = new WordCloudTheme(segoeUi,  WordCloudThemeWordRotation.Mixed, _colorPaletteInterpris, Brushes.White);
+            Interpris = new WordCloudTheme(segoeUi, WordCloudThemeWordRotation.Mixed, _colorPaletteInterpris, Brushes.White);
 
             // Horizontal
-            Horizontal1 = new WordCloudTheme(impact,  WordCloudThemeWordRotation.HorizontalOnly, _colorPalette1, Brushes.Black);
-  /*          Horizontal2 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette2, Brushes.Black);
-            Horizontal3 = new WordCloudTheme(comicSans, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette3, Brushes.Black);
-            Horizontal4 = new WordCloudTheme(georgia, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette4, Brushes.Black);
-            Horizontal5 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette5, Brushes.White);
-            Horizontal6 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette6, Brushes.White);
-            Horizontal7 = new WordCloudTheme(comicSans, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette7, Brushes.White);
-            Horizontal8 = new WordCloudTheme(georgia, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette8, Brushes.White);
-*/
+            Horizontal1 = new WordCloudTheme(impact, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette1, Brushes.Black);
+            /*          Horizontal2 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette2, Brushes.Black);
+                      Horizontal3 = new WordCloudTheme(comicSans, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette3, Brushes.Black);
+                      Horizontal4 = new WordCloudTheme(georgia, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette4, Brushes.Black);
+                      Horizontal5 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette5, Brushes.White);
+                      Horizontal6 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette6, Brushes.White);
+                      Horizontal7 = new WordCloudTheme(comicSans, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette7, Brushes.White);
+                      Horizontal8 = new WordCloudTheme(georgia, FontWeights.Normal, WordCloudThemeWordRotation.HorizontalOnly, _colorPalette8, Brushes.White);
+          */
             // Mixed (Horizontal & Vertical)
-            Mixed1 = new WordCloudTheme(impact,WordCloudThemeWordRotation.Mixed, _colorPalette1, Brushes.Black);
+            Mixed1 = new WordCloudTheme(impact, WordCloudThemeWordRotation.Mixed, _colorPalette1, Brushes.Black);
 /*
             Mixed2 = new WordCloudTheme(impact, FontWeights.Normal, WordCloudThemeWordRotation.Mixed, _colorPalette2, Brushes.Black);
             Mixed3 = new WordCloudTheme(comicSans, FontWeights.Normal, WordCloudThemeWordRotation.Mixed, _colorPalette3, Brushes.Black);
@@ -124,19 +123,20 @@ namespace WordCloudTest.WordCloud
 
         private static readonly List<SolidColorBrush> _colorPaletteInterpris = new List<SolidColorBrush>
         {
-            new SolidColorBrush(Color.FromArgb(255,231, 0, 149)), // #E70095
-                new SolidColorBrush(Color.FromArgb(255,83, 98, 112)), // #536270
-                    new SolidColorBrush(Color.FromArgb(255,156, 203, 62)), // #9CCB3E
-                        new SolidColorBrush(Color.FromArgb(255,61, 173, 180)) // #3DADB4
+            new SolidColorBrush(Color.FromArgb(255, 231, 0, 149)), // #E70095
+            new SolidColorBrush(Color.FromArgb(255, 83, 98, 112)), // #536270
+            new SolidColorBrush(Color.FromArgb(255, 156, 203, 62)), // #9CCB3E
+            new SolidColorBrush(Color.FromArgb(255, 61, 173, 180)) // #3DADB4
         };
 
         private static List<SolidColorBrush> _colorPalette1 = new List<SolidColorBrush>
         {
-            new SolidColorBrush(Color.FromArgb(255,141, 195, 242)),
-                new SolidColorBrush(Color.FromArgb(255,203, 228, 248)),
-                    new SolidColorBrush(Color.FromArgb(255,140, 191, 31)),
-                        new SolidColorBrush(Color.FromArgb(255,255, 255, 255))
+            new SolidColorBrush(Color.FromArgb(255, 141, 195, 242)),
+            new SolidColorBrush(Color.FromArgb(255, 203, 228, 248)),
+            new SolidColorBrush(Color.FromArgb(255, 140, 191, 31)),
+            new SolidColorBrush(Color.FromArgb(255, 255, 255, 255))
         };
+
 /*
 
         private static List<SolidColorBrush> _colorPalette2 = new List<SolidColorBrush>
@@ -190,6 +190,5 @@ namespace WordCloudTest.WordCloud
         private static List<Color> _colorPalette8 = new List<Color>
             {Colors.Black};
 */
-
     }
 }

@@ -23,6 +23,7 @@ namespace WordCloudTest
             foreach (var kvp in _words.OrderByDescending(x => x.Value))
             {
                 wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key), kvp.Value));
+          //      wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key + "z"), kvp.Value));
                 count += kvp.Value;
             }
 
@@ -36,29 +37,21 @@ namespace WordCloudTest
 
         public FrequencyTable<WordGroup> Words;
 
-        private void AddWord(object sender, RoutedEventArgs e)
+        private async void AddWord(object sender, RoutedEventArgs e)
         {
-            WordcloudControl.AddWord(_wordcloudControlDataContext);
+            await WordcloudControl.AddWord(_wordcloudControlDataContext);
             Failures.Text = WordcloudControl.Failures.ToString();
-            X.Text = WordcloudControl.LastAddedBounds.X.ToString();
-            Y.Text = WordcloudControl.LastAddedBounds.Y.ToString();
-            W.Text = WordcloudControl.LastAddedBounds.Width.ToString();
-            H.Text = WordcloudControl.LastAddedBounds.Height.ToString();
         }
 
-        private void DoWordCloud(object sender, RoutedEventArgs e)
+        private async void DoWordCloud(object sender, RoutedEventArgs e)
         {
             var s = new Stopwatch();
             s.Start();
 
-            WordcloudControl.AddWords(_wordcloudControlDataContext);
+            await WordcloudControl.AddWords(_wordcloudControlDataContext);
             s.Stop();
             Time.Text = s.ElapsedMilliseconds.ToString();
             Failures.Text = WordcloudControl.Failures.ToString();
-            X.Text = WordcloudControl.LastAddedBounds.X.ToString();
-            Y.Text = WordcloudControl.LastAddedBounds.Y.ToString();
-            W.Text = WordcloudControl.LastAddedBounds.Width.ToString();
-            H.Text = WordcloudControl.LastAddedBounds.Height.ToString();
             Debug.WriteLine(s.ElapsedMilliseconds);
         }
 
@@ -74,8 +67,8 @@ namespace WordCloudTest
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 100000},
-            {"windows", 99000},
+            {"coding", 10000},
+            {"windows", 9900},
             {"wawa", 9980},
             {"mac", 9970},
             {"use", 9960},
