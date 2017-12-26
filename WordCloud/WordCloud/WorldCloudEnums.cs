@@ -1,4 +1,4 @@
-﻿namespace WordCloudTest.WordClouds
+﻿namespace WordCloud.WordCloud
 {
     public enum WordCloudThemeWordRotation
     {

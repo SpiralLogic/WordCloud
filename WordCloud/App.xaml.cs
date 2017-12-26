@@ -1,6 +1,6 @@
 ﻿using System.Windows;
 
-namespace WordCloudTest
+namespace WordCloud
 {
     /// <summary>
     /// Interaction logic for App.xaml

@@ -4,9 +4,11 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
-using WordCloudTest.Annotations;
+using WordCloud.Annotations;
+using WordCloud.WordCloud;
+using WordCloud.WordFrequencyQuery;
 
-namespace WordCloudTest
+namespace WordCloud
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -67,7 +69,7 @@ namespace WordCloudTest
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 10000},
+            {"coding", 100000},
             {"windows", 9900},
             {"wawa", 9980},
             {"mac", 9970},

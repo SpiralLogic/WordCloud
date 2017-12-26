@@ -2,7 +2,13 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/WordCloudTest/obj
-/WordCloudTest/bin/Debug
+/WordCloud/obj
+/WordCloud/bin/Debug
 /.vs
 *.diagsession
+/WordCloud/bin/Debug/WordCloud.pdb
+/WordCloud/bin/Debug/WordCloud.exe.config
+/WordCloud/bin/Debug/WordCloud.exe
+/WordCloud/bin/Release/WordCloud.pdb
+/WordCloud/bin/Release/WordCloud.exe.config
+/WordCloud/bin/Release/WordCloud.exe

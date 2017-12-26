@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace WordCloudTest
+namespace WordCloud.WordFrequencyQuery
 {
     /// <summary>
     /// Frequency table generic class

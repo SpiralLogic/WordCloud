@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace WordCloudTest
+namespace WordCloud.WordFrequencyQuery
 {
     public class WordGroup
     {

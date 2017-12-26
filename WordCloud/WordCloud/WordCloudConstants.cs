@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace WordCloudTest.WordClouds
+namespace WordCloud.WordCloud
 {
     public class WordCloudConstants
     {
@@ -25,7 +25,7 @@ namespace WordCloudTest.WordClouds
         /// <summary>
         /// Minimum font size
         /// </summary>
-        public const int MinFontSize = 8;
+        public const int MinFontSize = 11;
 
         /// <summary>
         /// Minimum largest value

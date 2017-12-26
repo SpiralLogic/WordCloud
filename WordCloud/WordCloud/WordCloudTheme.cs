@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Windows.Media;
 
-namespace WordCloudTest.WordClouds
+namespace WordCloud.WordCloud
 {
     public class WordCloudTheme
     {
