@@ -5,10 +5,10 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using WordCloud.Annotations;
-using WordCloud.WordCloud;
+using WordCloud.Structures;
 using WordCloud.WordFrequencyQuery;
 
-namespace WordCloud
+namespace WordCloud.Views
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
@@ -19,16 +19,14 @@ namespace WordCloud
         {
             InitializeComponent();
 
-
             var wordlist = new List<FrequencyTableRow<WordGroup>>();
             var count = 0;
             foreach (var kvp in _words.OrderByDescending(x => x.Value))
             {
                 wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key), kvp.Value));
-          //      wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key + "z"), kvp.Value));
+                //      wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key + "z"), kvp.Value));
                 count += kvp.Value;
             }
-
 
             Words = new FrequencyTable<WordGroup>(wordlist, count);
 
@@ -39,9 +37,9 @@ namespace WordCloud
 
         public FrequencyTable<WordGroup> Words;
 
-        private async void AddWord(object sender, RoutedEventArgs e)
+        private void AddWord(object sender, RoutedEventArgs e)
         {
-            await WordcloudControl.AddWord(_wordcloudControlDataContext);
+            WordcloudControl.AddWord(_wordcloudControlDataContext);
             Failures.Text = WordcloudControl.Failures.ToString();
         }
 
@@ -372,6 +370,7 @@ namespace WordCloud
 
         private WordCloudData _wordcloudControlDataContext;
         private WordCloudData _wordCloudData;
+
         public event PropertyChangedEventHandler PropertyChanged;
 
         [NotifyPropertyChangedInvocator]

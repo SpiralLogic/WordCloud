@@ -1,4 +1,4 @@
-﻿namespace WordCloud.WordCloud
+﻿namespace WordCloud.Structures
 {
     public interface IRandomizer
     {

@@ -7,17 +7,14 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-
-using System.Windows.Input;
-using WordCloud.WordCloud;
+using WordCloud.Structures;
 
 namespace WordCloud.Views
 {
     /// <summary>
-    /// Interaction logic for WordCloud.xaml
+    /// Interaction logic for WordCloudControl.xaml
     /// </summary>
-    public partial class WordCloud
+    public partial class WordCloudControl
     {
         private const int MaxWords = 300;
 
@@ -34,18 +31,18 @@ namespace WordCloud.Views
         private readonly IRandomizer _randomizer;
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
 
-        public WordCloud()
+        public WordCloudControl()
         {
             InitializeComponent();
 
-            var di = new DrawingImage {Drawing = _mainDrawingGroup};
+            var di = new DrawingImage { Drawing = _mainDrawingGroup };
 
             BaseImage.Source = di;
             BaseImage.Stretch = Stretch.None;
             _randomizer = new CryptoRandomizer();
         }
 
-        public WordCloud(IRandomizer randomizer) : this()
+        public WordCloudControl(IRandomizer randomizer) : this()
         {
             _randomizer = randomizer ?? new CryptoRandomizer();
         }
@@ -72,7 +69,7 @@ namespace WordCloud.Views
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
         }
 
-        private async Task AddWordInternal()
+        private void AddWordInternal()
         {
             var word = _words[_currentWord];
 
@@ -113,29 +110,14 @@ namespace WordCloud.Views
                 while (!geoList.IsAddingCompleted || geoList.Count > 0)
                 {
                     var add = geoList.Take();
-                    Dispatcher.InvokeAsync(() =>
-                    {
-                        DoubleAnimation opacityAnimation = new DoubleAnimation();
-                        opacityAnimation.To = 0.0;
-                        opacityAnimation.Duration = TimeSpan.FromSeconds(0.5);
-                        opacityAnimation.AutoReverse = true;
-                        Storyboard.SetTargetName(opacityAnimation, "MyAnimatedBrush");
-                        Storyboard.SetTargetProperty(
-                            opacityAnimation, new PropertyPath(SolidColorBrush.OpacityProperty));
-                        Storyboard mouseLeftButtonDownStoryboard = new Storyboard();
-                        mouseLeftButtonDownStoryboard.Children.Add(opacityAnimation);
-                        add.MouseLeftButtonDown += delegate (object sender, MouseButtonEventArgs e)
-                        {
-                            mouseLeftButtonDownStoryboard.Begin(this);
-                        }; _wordDrawingGroup.Children.Add(add);
-                    });
+                    Dispatcher.InvokeAsync(() => { _wordDrawingGroup.Children.Add(add); });
                 }
             });
 
             await Task.WhenAll(addTask, displayTask);
             geoList.Dispose();
 
-         _mainDrawingGroup.Children.Remove(_bgDrawingGroup);
+            _mainDrawingGroup.Children.Remove(_bgDrawingGroup);
 
             RecenterFinishedWordGroup();
 
@@ -159,7 +141,7 @@ namespace WordCloud.Views
                 BaseImage.Stretch = Stretch.Uniform;
             }
 
-  //           AddCollisionDebug();
+            //           AddCollisionDebug();
         }
 
         private void AddCollisionDebug()
@@ -185,7 +167,7 @@ namespace WordCloud.Views
             _mainDrawingGroup.Children.Add(dg);
         }
 
-        public async Task AddWord(WordCloudData wordCloudData)
+        public void AddWord(WordCloudData wordCloudData)
         {
             if (_currentWord == _words.Count)
             {
@@ -197,7 +179,7 @@ namespace WordCloud.Views
                 Setup();
             }
 
-            await AddWordInternal();
+            AddWordInternal();
         }
 
         public async Task AddWords(WordCloudData wordCloudData)
@@ -220,10 +202,8 @@ namespace WordCloud.Views
             var textGeometry = text.BuildGeometry(new Point(0, 0));
             var wordGeo = new WordGeo(textGeometry, word);
 
-
             return _cloudSpace.AddWordGeometry(wordGeo) ? wordGeo.GetDrawing() : null;
         }
-
 
         private void PopulateWordList(WordCloudData wordCloudData)
         {
@@ -257,13 +237,13 @@ namespace WordCloud.Views
 
                 // At this stage, the word alpha value is set to be the same as the size value making the word color fade proportionally with word size
                 _words.Add(new WordCloudEntry
-                    {
-                        Word = row.Item.Word,
-                        wordWeight = row.Count * WordCloudConstants.WeightedFrequencyMultiplier,
-                        Color = CurrentTheme.ColorList[colorIndex],
-                        AlphaValue = row.Count,
-                        Angle = angle
-                    }
+                {
+                    Word = row.Item.Word,
+                    wordWeight = row.Count * WordCloudConstants.WeightedFrequencyMultiplier,
+                    Color = CurrentTheme.ColorList[colorIndex],
+                    AlphaValue = row.Count,
+                    Angle = angle
+                }
                 );
             }
         }
@@ -295,7 +275,7 @@ namespace WordCloud.Views
 
         private int GetFontSize(int size)
         {
-            return (int) ((size - _minWordWeight) * _fontMultiplier + WordCloudConstants.MinFontSize);
+            return (int)((size - _minWordWeight) * _fontMultiplier + WordCloudConstants.MinFontSize);
         }
 
         private double GetAverageLetterPixelWidth()
@@ -312,7 +292,7 @@ namespace WordCloud.Views
         }
     }
 
-    enum StartPosition
+    internal enum StartPosition
     {
         Center,
         Random,

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Windows;
 
-namespace WordCloud.WordCloud
+namespace WordCloud.Structures
 {
     class SpiralPositioner : IPositioner
     {

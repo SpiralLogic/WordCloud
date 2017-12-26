@@ -7,7 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using WordCloud.Views;
 
-namespace WordCloud.WordCloud
+namespace WordCloud.Structures
 {
     class CloudSpace
     {

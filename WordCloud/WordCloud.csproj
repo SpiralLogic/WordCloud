@@ -54,23 +54,23 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="WordCloud\CloudSpace.cs" />
-    <Compile Include="WordCloud\CryptoRandomizer.cs" />
-    <Compile Include="WordCloud\IPositioner.cs" />
-    <Compile Include="WordCloud\IRandomizer.cs" />
-    <Compile Include="WordCloud\SpiralPositioner.cs" />
-    <Compile Include="WordCloud\WordGeo.cs" />
-    <Compile Include="WordCloud\WordCloudThemes.cs" />
+    <Compile Include="Structures\CloudSpace.cs" />
+    <Compile Include="Structures\CryptoRandomizer.cs" />
+    <Compile Include="Structures\IPositioner.cs" />
+    <Compile Include="Structures\IRandomizer.cs" />
+    <Compile Include="Structures\SpiralPositioner.cs" />
+    <Compile Include="Structures\WordGeo.cs" />
+    <Compile Include="Structures\WordCloudThemes.cs" />
     <Compile Include="WordFrequencyQuery\FrequencyTable.cs" />
     <Compile Include="Properties\Annotations.cs" />
-    <Compile Include="Views\WordCloud.xaml.cs">
-      <DependentUpon>WordCloud.xaml</DependentUpon>
+    <Compile Include="Views\WordCloudControl.xaml.cs">
+      <DependentUpon>WordCloudControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="WordCloud\WordCloudConstants.cs" />
-    <Compile Include="WordCloud\WordCloudData.cs" />
-    <Compile Include="WordCloud\WordCloudEntry.cs" />
-    <Compile Include="WordCloud\WordCloudTheme.cs" />
-    <Compile Include="WordCloud\WorldCloudEnums.cs" />
+    <Compile Include="Structures\WordCloudConstants.cs" />
+    <Compile Include="Structures\WordCloudData.cs" />
+    <Compile Include="Structures\WordCloudEntry.cs" />
+    <Compile Include="Structures\WordCloudTheme.cs" />
+    <Compile Include="Structures\WorldCloudEnums.cs" />
     <Compile Include="WordFrequencyQuery\WordGroup.cs" />
     <Page Include="Views\MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
@@ -84,7 +84,7 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="Views\WordCloud.xaml">
+    <Page Include="Views\WordCloudControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -117,6 +117,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="ViewModels\" />
+    <Folder Include="WordCloud\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
