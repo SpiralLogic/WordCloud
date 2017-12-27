@@ -7,9 +7,9 @@
         mc:Ignorable="d"
         Title="MainWindow" Height="1300" Width="1500" BorderThickness="0">
     <StackPanel>
-        <views:WordCloudControl DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="700" Width="700"></views:WordCloudControl>
+        <views:WordCloudControl DataContext="{Binding WordCloudData}" x:Name="WordcloudControl" Height="800" Width="800"></views:WordCloudControl>
         <Button Click="AddWord" Content="add"></Button>
-        <Button Click="DoWordCloud" Content="do"></Button>
+        <Button  Click="DoWordCloud" Content="do"></Button>
         <TextBlock Name="Time"></TextBlock>
         <TextBlock Name="Failures"></TextBlock>
     </StackPanel>

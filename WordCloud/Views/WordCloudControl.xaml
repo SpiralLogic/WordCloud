@@ -6,7 +6,7 @@
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="500">
     <Grid Name="LayoutRoot">
-        <Image x:Name="BaseImage" Stretch="None" SnapsToDevicePixels="True" Margin="4">
+        <Image MouseDown="BaseImage_OnMouseDown" x:Name="BaseImage" Stretch="None" SnapsToDevicePixels="True" Margin="4">
         </Image>
     </Grid>
 </UserControl>

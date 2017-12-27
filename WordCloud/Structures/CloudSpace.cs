@@ -32,14 +32,14 @@ namespace WordCloud.Structures
         private readonly Pen _pen;
         public int FailedPlacements { get; private set; } = 0;
 
-        private const int Buffer = 0;
+        private const int Buffer = 1;
 
         public CloudSpace(double width, double height)
         {
             Width = width;
             Height = height;
             CloudCenter = new Point(width / 2, height / 2);
-            _positioner = new SpiralPositioner(CloudCenter);
+            _positioner = new SpiralPositioner(new Size(Width,Height));
             _pen = new Pen(Brushes.Purple, 1);
             _pen.Freeze();
         }
@@ -47,7 +47,7 @@ namespace WordCloud.Structures
         public CloudSpace(double width, double height, IRandomizer randomizer = null) : this(width, height)
         {
             _randomizer = randomizer ?? new CryptoRandomizer();
-            _positioner = new SpiralPositioner(CloudCenter);
+            _positioner = new SpiralPositioner(new Size(Width,Height));
         }
 
         private bool CalculateNextStartingPoint(WordGeo wordGeo)
@@ -108,8 +108,24 @@ namespace WordCloud.Structures
                     _positioner.StartY = CloudCenter.Y - wordGeo.Center.Y;
                     break;
                 case StartPosition.Random:
-                    _positioner.StartX = wordGeo.Center.X + _randomizer.RandomInt((int) (_collisionMapWidth - wordGeo.Center.X));
-                    _positioner.StartY = wordGeo.Center.Y + _randomizer.RandomInt((int) (_collisionMapHeight - wordGeo.Center.Y));
+                    var quad = _randomizer.RandomInt(4);
+                    var xMod = 0.0;
+                    var yMod = 0.0;
+                    switch (quad)
+                    {
+                        case 1:
+                            yMod = -CloudCenter.Y;
+                            break;
+                        case 2:
+                            xMod = -CloudCenter.X;
+                            yMod = -CloudCenter.Y;
+                            break;
+                        case 3:
+                            xMod = -CloudCenter.X;
+                            break;
+                    }
+                    _positioner.StartX = xMod + _randomizer.RandomInt((int)(CloudCenter.X * 1.5), (int) (_collisionMapWidth - wordGeo.Width));
+                    _positioner.StartY = yMod + _randomizer.RandomInt((int)(CloudCenter.Y * 1.5), (int) (_collisionMapHeight - wordGeo.Height));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(position), position, null);
@@ -151,13 +167,12 @@ namespace WordCloud.Structures
                 for (var i = 0; i < testWidth * Pbgra32Bytes; i += Pbgra32Bytes)
                 {
                     var mapIndex = mapPosition + i / Pbgra32Bytes;
-                    
+
                     var isCollisionPoint = newWordBytes[testOffset + i] != Pbgra32Alpha;
                     if (isCollisionPoint && _collisionMap[mapIndex]) return true;
-
                 }
             }
-            //_collisionRects.Add(new Rect(testX, testY, testWidth, testHeight));
+
             return false;
         }
 
@@ -210,7 +225,7 @@ namespace WordCloud.Structures
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private bool IsOutOfBounds(WordGeo wordGeo)
         {
-            return wordGeo.IntRight > _collisionMapWidth || wordGeo.IntBottom > _collisionMapHeight || wordGeo.X < 0 || wordGeo.Y < 0;
+            return wordGeo.IntRight > _collisionMapWidth -Buffer || wordGeo.IntBottom > _collisionMapHeight - Buffer || wordGeo.X < 0 || wordGeo.Y < 0;
         }
 
         public bool AddWordGeometry(WordGeo wordGeo)
@@ -227,17 +242,20 @@ namespace WordCloud.Structures
             var attempts = 0;
             while (HasCollision(newBytes, wordGeo))
             {
-                if (!CalculateNextStartingPoint(wordGeo) || IsOutOfBounds(wordGeo))
+                do
                 {
-                    if (attempts > RepositionAttempts)
+                    var result = CalculateNextStartingPoint(wordGeo);
+                    if (!result && attempts > RepositionAttempts)
                     {
                         FailedPlacements++;
                         return false;
                     }
+
+                    if (result) continue;
                     DefaultStartingPosition = StartPosition.Random;
                     SetStartingPosition(wordGeo, StartPosition.Random);
                     attempts++;
-                }
+                } while (IsOutOfBounds(wordGeo));
             }
 
             if (DefaultStartingPosition == StartPosition.Random)

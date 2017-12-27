@@ -67,8 +67,8 @@ namespace WordCloud.Structures
         public int IntWidth { get; }
         public int IntHeight { get; }
 
-        public int IntX => (int) Math.Floor(_bounds.X);
-        public int IntY => (int) Math.Floor(_bounds.Y);
+        public int IntX => (int) Math.Ceiling(_bounds.X);
+        public int IntY => (int) Math.Ceiling(_bounds.Y);
 
         public int IntBottom => IntY + IntHeight;
         public int IntRight => IntX + IntWidth;

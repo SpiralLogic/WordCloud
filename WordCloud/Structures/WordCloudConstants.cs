@@ -4,21 +4,6 @@ namespace WordCloud.Structures
 {
     public class WordCloudConstants
     {
-        // Minimum alpha
-        public const byte FromAlpha = 192;
-
-        // Maximum alpha
-        public const byte ToAlpha = 255;
-
-        /// <summary>
-        /// Multiplier for spiral calculations
-        /// </summary>
-        public const int SpiralRadius = 7;
-
-        /// <summary>
-        /// Double Pi
-        /// </summary>
-        public const double DoublePi = 2.0 * Math.PI;
 
         public const int MaxWords = 100;
 
@@ -41,12 +26,6 @@ namespace WordCloud.Structures
         /// Minimum length for font sizing calculations of the largest word
         /// </summary>
         public const int MinimumLargestWordLength = 4;
-
-        /// <summary>
-        /// Margin for vertical cropping - increase this to increase the amount of top & bottom whitespace
-        /// around word cloud
-        /// </summary>
-        public const int VerticalCroppingMargin = 10;
 
         /// <summary>
         /// Target width factor for adjusting bitmap size
@@ -80,9 +59,5 @@ namespace WordCloud.Structures
         /// </summary>
         public const int WeightedFrequencyMultiplier = 100;
 
-        /// <summary>
-        /// The margin to be used for exporting the Tree Map to PDF
-        /// </summary>
-        public const int PdfExportMargin = 40;
     }
 }

@@ -1,13 +1,18 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using WordCloud.Structures;
+
+// ReSharper disable AccessToDisposedClosure
 
 namespace WordCloud.Views
 {
@@ -16,26 +21,28 @@ namespace WordCloud.Views
     /// </summary>
     public partial class WordCloudControl
     {
-        private const int MaxWords = 300;
+        private const int MaxWords = 100;
 
         private int _currentWord;
-        private int _minWordWeight;
         private double _fontMultiplier;
 
-        private readonly List<WordCloudEntry> _words = new List<WordCloudEntry>();
+        private IReadOnlyList<WordCloudEntry> _words;
         private readonly DrawingGroup _wordDrawingGroup = new DrawingGroup();
         private readonly DrawingGroup _mainDrawingGroup = new DrawingGroup();
         private readonly DrawingGroup _bgDrawingGroup = new DrawingGroup();
 
         private CloudSpace _cloudSpace;
         private readonly IRandomizer _randomizer;
+        private CancellationTokenSource _cts;
+        private Task _cloudGenerationTask;
+        private readonly SemaphoreSlim _cloudGenerationSemaphore = new SemaphoreSlim(1, 1);
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
 
         public WordCloudControl()
         {
             InitializeComponent();
 
-            var di = new DrawingImage { Drawing = _mainDrawingGroup };
+            var di = new DrawingImage {Drawing = _mainDrawingGroup};
 
             BaseImage.Source = di;
             BaseImage.Stretch = Stretch.None;
@@ -54,7 +61,6 @@ namespace WordCloud.Views
         {
             _cloudSpace = new CloudSpace(Width - 4, Height - 4, _randomizer);
 
-            _minWordWeight = _words.Min(e => e.wordWeight);
             _fontMultiplier = GetFontMultiplier();
 
             _mainDrawingGroup.Children.Clear();
@@ -85,43 +91,82 @@ namespace WordCloud.Views
             _mainDrawingGroup.Children.Clear();
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
 
-            RecenterFinishedWordGroup();
+            //     RecenterFinishedWordGroup();
         }
 
         private async Task AddWordsInternal()
         {
-            var geoList = new BlockingCollection<Drawing>();
-            var addTask = Task.Run(() =>
-            {
-                foreach (var word in _words)
-                {
-                    var geo = CreateWordGeometry(word);
+            var previousCts = _cts;
+            _cts = new CancellationTokenSource();
 
-                    if (geo != null)
+            if (previousCts != null)
+            {
+                // cancel the previous cloud generation and wait for its termination
+                previousCts.Cancel();
+
+                try
+                {
+                    await _cloudGenerationTask;
+                }
+                // we don't care about canceled cloud failures including other exceptions they cause
+                // ReSharper disable once EmptyGeneralCatchClause
+                catch
+                {
+                }
+            }
+
+            await _cloudGenerationSemaphore.WaitAsync(_cts.Token);
+            var geoList = new BlockingCollection<GeometryDrawing>(_words.Count);
+            try
+            {
+                var addTask = Task.Run(() =>
+                {
+                    foreach (var word in _words)
                     {
-                        geoList.Add(geo);
+                        _cts.Token.ThrowIfCancellationRequested();
+                        var geo = CreateWordGeometry(word);
+
+                        if (geo != null)
+                        {
+                            geoList.Add(geo);
+                        }
+                        _currentWord++;
                     }
-                    _currentWord++;
-                }
-                geoList.CompleteAdding();
-            });
-            var displayTask = Task.Run(() =>
-            {
-                while (!geoList.IsAddingCompleted || geoList.Count > 0)
+                    geoList.CompleteAdding();
+                }, _cts.Token);
+
+                var displayTask = Task.Run(() =>
                 {
-                    var add = geoList.Take();
-                    Dispatcher.InvokeAsync(() => { _wordDrawingGroup.Children.Add(add); });
-                }
-            });
+                    try
+                    {
+                        while (!geoList.IsAddingCompleted || geoList.Count > 0)
+                        {
+                            _cts.Token.ThrowIfCancellationRequested();
+                            var add = geoList.Take();
+                            Dispatcher.InvokeAsync(() => { _wordDrawingGroup.Children.Add(add.Clone()); });
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                    }
+                }, _cts.Token);
 
-            await Task.WhenAll(addTask, displayTask);
-            geoList.Dispose();
+                _cloudGenerationTask = Task.WhenAll(addTask, displayTask);
+                await _cloudGenerationTask;
 
-            _mainDrawingGroup.Children.Remove(_bgDrawingGroup);
+                //           _mainDrawingGroup.Children.Remove(_bgDrawingGroup);
 
-            RecenterFinishedWordGroup();
-
-            _currentWord = 0;
+                //    RecenterFinishedWordGroup();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                geoList.Dispose();
+                _currentWord = 0;
+                _cloudGenerationSemaphore.Release();
+            }
         }
 
         private void RecenterFinishedWordGroup()
@@ -144,28 +189,28 @@ namespace WordCloud.Views
             //           AddCollisionDebug();
         }
 
-        private void AddCollisionDebug()
-        {
-            var dg = new DrawingGroup();
-            using (var c = dg.Open())
-            {
-                for (var y = 0; y < _cloudSpace._collisionMapHeight; y++)
-                {
-                    for (var x = 0; x < _cloudSpace._collisionMapWidth; x++)
-                    {
-                        if (_cloudSpace._collisionMap[x + y * _cloudSpace._collisionMapWidth])
-                        {
-                            c.DrawEllipse(Brushes.Purple, null, new Point(x, y), 1, 1);
-                        }
-                    }
-                }
-                foreach (var rect in _cloudSpace._collisionRects)
-                {
-                    c.DrawRectangle(null, new Pen(Brushes.Red, 1), rect);
-                }
-            }
-            _mainDrawingGroup.Children.Add(dg);
-        }
+        /*  private void AddCollisionDebug()
+          {
+              var dg = new DrawingGroup();
+              using (var c = dg.Open())
+              {
+                  for (var y = 0; y < _cloudSpace._collisionMapHeight; y++)
+                  {
+                      for (var x = 0; x < _cloudSpace._collisionMapWidth; x++)
+                      {
+                          if (_cloudSpace._collisionMap[x + y * _cloudSpace._collisionMapWidth])
+                          {
+                              c.DrawEllipse(Brushes.Purple, null, new Point(x, y), 1, 1);
+                          }
+                      }
+                  }
+                  foreach (var rect in _cloudSpace._collisionRects)
+                  {
+                      c.DrawRectangle(null, new Pen(Brushes.Red, 1), rect);
+                  }
+              }
+              _mainDrawingGroup.Children.Add(dg);
+          }*/
 
         public void AddWord(WordCloudData wordCloudData)
         {
@@ -186,7 +231,13 @@ namespace WordCloud.Views
         {
             PopulateWordList(wordCloudData);
             if (_cloudSpace == null) Setup();
-            await AddWordsInternal();
+            try
+            {
+                await AddWordsInternal();
+            }
+            catch (OperationCanceledException)
+            {
+            }
         }
 
         private GeometryDrawing CreateWordGeometry(WordCloudEntry word)
@@ -195,9 +246,10 @@ namespace WordCloud.Views
                 CultureInfo.CurrentUICulture,
                 FlowDirection.LeftToRight,
                 CurrentTheme.Typeface,
-                GetFontSize(word.wordWeight),
+                GetFontSize(word),
                 word.Color,
                 DpiScale.PixelsPerDip);
+
 
             var textGeometry = text.BuildGeometry(new Point(0, 0));
             var wordGeo = new WordGeo(textGeometry, word);
@@ -207,6 +259,7 @@ namespace WordCloud.Views
 
         private void PopulateWordList(WordCloudData wordCloudData)
         {
+            var wordList = new List<WordCloudEntry>();
             foreach (var row in wordCloudData.Words.Rows.Take(MaxWords))
             {
                 var colorIndex = 0;
@@ -221,7 +274,7 @@ namespace WordCloud.Views
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
                     // First word always horizontal 70% Horizontal (default), 30% Vertical
-                    if (_words.Any() && _randomizer.RandomInt(10) >= 7)
+                    if (wordList.Any() && _randomizer.RandomInt(10) >= 7)
                     {
                         angle = WordCloudConstants.MixedRotationVertical;
                     }
@@ -229,58 +282,52 @@ namespace WordCloud.Views
                 else if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Random)
                 {
                     // First word always horizontal
-                    if (!_words.Any())
+                    if (!wordList.Any())
                     {
                         angle = -WordCloudConstants.RandomMaxRotationAbs + _randomizer.RandomInt(WordCloudConstants.RandomRange);
                     }
                 }
 
                 // At this stage, the word alpha value is set to be the same as the size value making the word color fade proportionally with word size
-                _words.Add(new WordCloudEntry
-                {
-                    Word = row.Item.Word,
-                    wordWeight = row.Count * WordCloudConstants.WeightedFrequencyMultiplier,
-                    Color = CurrentTheme.ColorList[colorIndex],
-                    AlphaValue = row.Count,
-                    Angle = angle
-                }
+                wordList.Add(new WordCloudEntry
+                    {
+                        Word = row.Item.Word,
+                        wordWeight = row.Count,
+                        Color = CurrentTheme.ColorList[colorIndex],
+                        AlphaValue = row.Count,
+                        Angle = angle
+                    }
                 );
             }
+            _words = wordList.AsReadOnly();
         }
 
         private double GetFontMultiplier()
         {
-            var maxWordWeight = Math.Max(_words.Max(e => e.wordWeight), WordCloudConstants.MinimumLargestValue);
-            var wordWeightRange = Math.Max(0.00001, maxWordWeight - _minWordWeight);
-            var areaPerLetter = GetAverageLetterPixelWidth() / wordWeightRange;
+            var averageLetterWidth = GetAverageLetterPixelWidth();
+            var totalWeight = _words.Sum(w => w.wordWeight);
+            var possibleRows = Math.Floor(_cloudSpace.Height / averageLetterWidth);
+            var totalWidth = _words.Sum(w => w.Word.Length * averageLetterWidth * (w.wordWeight / (double) totalWeight));
+            var sizePerRow = totalWidth / possibleRows;
 
-            var targetWidth = (_cloudSpace.Width + _cloudSpace.Height) / WordCloudConstants.TargetWidthFactor * WordCloudConstants.LargestSizeWidthProportion;
-            var largestWord = _words.OrderByDescending(e => (e.wordWeight - _minWordWeight) * e.Word.Length).First();
-
-            // Use minimum word length of MINIMUM_LARGEST_WORD_LENGTH to avoid over scaling
-            var largestWordLength = Math.Max(largestWord.Word.Length, WordCloudConstants.MinimumLargestWordLength);
-
-            var maxWordSize = 100 / ((largestWord.wordWeight - _minWordWeight) * largestWordLength * areaPerLetter / targetWidth);
-
-            // Reduce the maximum word size for random theme to avoid placement/collision issues due to high angle values
-            if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Random)
-            {
-                maxWordSize *= 1;
-            }
-
-            var maxFontSize = Math.Max(WordCloudConstants.MinFontSize * 2.7, maxWordSize);
-
-            return Math.Min((maxFontSize - WordCloudConstants.MinFontSize) / wordWeightRange, 200);
+            return _cloudSpace.Width / sizePerRow;
         }
 
-        private int GetFontSize(int size)
+        private int GetFontSize(WordCloudEntry word)
         {
-            return (int)((size - _minWordWeight) * _fontMultiplier + WordCloudConstants.MinFontSize);
+            var maxFontSize = _cloudSpace.Width / _words.First().Word.Length;
+            var totalWeight = _words.Sum(w => w.wordWeight);
+            double relativeSize = word.wordWeight / (double) totalWeight;
+            var fontSize = 100 * relativeSize;
+
+
+            var normalizedFontSize = Math.Max(Math.Min(fontSize * _fontMultiplier , maxFontSize), WordCloudConstants.MinFontSize);
+            return (int) normalizedFontSize;
         }
 
         private double GetAverageLetterPixelWidth()
         {
-            var txt = new FormattedText("X",
+            var txt = new FormattedText("M",
                 Thread.CurrentThread.CurrentCulture,
                 FlowDirection.LeftToRight,
                 CurrentTheme.Typeface,
@@ -288,7 +335,30 @@ namespace WordCloud.Views
                 Brushes.Black,
                 DpiScale.PixelsPerDip);
 
-            return txt.Width;
+            return txt.BuildGeometry(new Point(0, 0)).Bounds.Width;
+        }
+
+        private void BaseImage_OnMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            var image = e.Source as Image;
+            var position = e.GetPosition(this);
+            Debug.WriteLine(position);
+            position = new Point(position.X - 4, position.Y - 4);
+            Debug.WriteLine(_wordDrawingGroup.Children.OfType<GeometryDrawing>().Sum(w=>w.Geometry.Bounds.Width));
+            Debug.WriteLine(_wordDrawingGroup.Bounds.Width);
+            foreach (var word in _wordDrawingGroup.Children.OfType<GeometryDrawing>().ToList())
+            {
+                if(word.Geometry.Bounds.Contains(position))
+                using (var c = _wordDrawingGroup.Append())
+                {
+                    c.DrawRectangle(null, new Pen(Brushes.Red, 1), word.Geometry.Bounds);
+                }
+            }
+            using (var c = _wordDrawingGroup.Append())
+            {
+                
+                c.DrawEllipse(null, new Pen(Brushes.Purple, 1), position, 1, 1);
+            }
         }
     }
 
