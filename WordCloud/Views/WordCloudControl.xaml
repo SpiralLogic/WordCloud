@@ -5,8 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="500" d:DesignWidth="500">
-    <Grid Name="LayoutRoot">
-        <Image MouseDown="BaseImage_OnMouseDown" x:Name="BaseImage" Stretch="None" SnapsToDevicePixels="True" Margin="4">
+    <Grid Name="LayoutRoot" >
+        <Border BorderThickness="4" >
+        <Image MouseDown="BaseImage_OnMouseDown" x:Name="BaseImage" Stretch="None" SnapsToDevicePixels="True" >
+            
         </Image>
+        </Border>
     </Grid>
 </UserControl>

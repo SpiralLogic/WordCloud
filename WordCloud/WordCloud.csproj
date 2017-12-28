@@ -59,14 +59,13 @@
     <Compile Include="Structures\IPositioner.cs" />
     <Compile Include="Structures\IRandomizer.cs" />
     <Compile Include="Structures\SpiralPositioner.cs" />
-    <Compile Include="Structures\WordGeo.cs" />
+    <Compile Include="Structures\WordDrawing.cs" />
     <Compile Include="Structures\WordCloudThemes.cs" />
     <Compile Include="WordFrequencyQuery\FrequencyTable.cs" />
     <Compile Include="Properties\Annotations.cs" />
     <Compile Include="Views\WordCloudControl.xaml.cs">
       <DependentUpon>WordCloudControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Structures\WordCloudConstants.cs" />
     <Compile Include="Structures\WordCloudData.cs" />
     <Compile Include="Structures\WordCloudEntry.cs" />
     <Compile Include="Structures\WordCloudTheme.cs" />

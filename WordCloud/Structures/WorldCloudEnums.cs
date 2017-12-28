@@ -2,7 +2,7 @@
 {
     public enum WordCloudThemeWordRotation
     {
-        HorizontalOnly,
+        Horizontal,
         Mixed,
         Random
     }

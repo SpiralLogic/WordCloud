@@ -5,68 +5,37 @@ namespace WordCloud.Structures
 {
     public class WordCloudTheme
     {
-        /// <summary>
-        /// Initializes a new instance of the <see cref="WordCloudTheme"/> class.
-        /// </summary>
-        public WordCloudTheme(Typeface typeFace,  WordCloudThemeWordRotation wordRotation, List<SolidColorBrush> colorList, SolidColorBrush backgroundColor)
+        public WordCloudTheme(Typeface typeFace,  WordCloudThemeWordRotation wordRotation, IList<SolidColorBrush> brushList, SolidColorBrush backgroundBrush)
         {
             Typeface = typeFace;
             WordRotation = wordRotation;
-            ColorList = colorList;
-            BackgroundColor = backgroundColor;
+            BrushList = brushList;
+            BackgroundBrush = backgroundBrush;
 
-            foreach (var colour in ColorList)
+            foreach (var color in BrushList)
             {
-                colour.Freeze();
+                color.Freeze();
             }
         }
 
-        /// <summary>
-        /// Gets or sets the font.
-        /// </summary>
-        /// <value>
-        /// The font.
-        /// </value>
         public Typeface Typeface
         {
             get;
-            set;
         }
 
-        /// <summary>
-        /// Gets or sets the word rotation.
-        /// </summary>
-        /// <value>
-        /// The text alignment.
-        /// </value>
         public WordCloudThemeWordRotation WordRotation
         {
             get;
-            set;
         }
-
-        /// <summary>
-        /// Gets or sets the color list.
-        /// </summary>
-        /// <value>
-        /// The color list.
-        /// </value>
-        public List<SolidColorBrush> ColorList
+        
+        public IList<SolidColorBrush> BrushList
         {
             get;
-            set;
         }
 
-        /// <summary>
-        /// Gets or sets the color of the background.
-        /// </summary>
-        /// <value>
-        /// The color of the background.
-        /// </value>
-        public SolidColorBrush BackgroundColor
+        public SolidColorBrush BackgroundBrush
         {
             get;
-            set;
         }
     }
 }

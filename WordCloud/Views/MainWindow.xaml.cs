@@ -32,26 +32,20 @@ namespace WordCloud.Views
 
             _wordcloudControlDataContext = new WordCloudData(Words);
 
-            WordcloudControl.DataContext = _wordcloudControlDataContext;
+            WordCloudControl.DataContext = _wordcloudControlDataContext;
         }
 
         public FrequencyTable<WordGroup> Words;
-
-        private void AddWord(object sender, RoutedEventArgs e)
-        {
-            WordcloudControl.AddWord(_wordcloudControlDataContext);
-            Failures.Text = WordcloudControl.Failures.ToString();
-        }
-
+        
         private async void DoWordCloud(object sender, RoutedEventArgs e)
         {
             var s = new Stopwatch();
             s.Start();
 
-            await WordcloudControl.AddWords(_wordcloudControlDataContext);
+            await WordCloudControl.AddWords(_wordcloudControlDataContext);
             s.Stop();
             Time.Text = s.ElapsedMilliseconds.ToString();
-            Failures.Text = WordcloudControl.Failures.ToString();
+            Failures.Text = WordCloudControl.Failures.ToString();
             Debug.WriteLine(s.ElapsedMilliseconds);
         }
 
@@ -67,7 +61,7 @@ namespace WordCloud.Views
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 150000},
+            {"coding", 15000},
             {"windows", 10000},
             {"wawa", 9980},
             {"mac", 9970},

@@ -11,26 +11,25 @@ namespace WordCloud.Structures
 {
     class CloudSpace
     {
-        private StartPosition DefaultStartingPosition = StartPosition.Center;
+        private StartPosition _defaultStartingPosition = StartPosition.Center;
 
         private readonly PixelFormat _pixelFormat = PixelFormats.Pbgra32;
         private readonly IRandomizer _randomizer;
         private readonly IPositioner _positioner;
 
-        private int RepositionAttempts = 4;
+        private const int RepositionAttempts = 4;
         private const int Pbgra32Bytes = 4;
         private const int Pbgra32Alpha = 0;
         public double Width { get; }
         public double Height { get; }
         public Point CloudCenter;
 
-        public BitArray _collisionMap;
-        public int _collisionMapWidth;
+        private BitArray _collisionMap;
+        private int _collisionMapWidth;
 
-        public int _collisionMapHeight;
-        public List<Rect> _collisionRects = new List<Rect>();
+        private int _collisionMapHeight;
         private readonly Pen _pen;
-        public int FailedPlacements { get; private set; } = 0;
+        public int FailedPlacements { get; private set; }
 
         private const int Buffer = 1;
 
@@ -39,7 +38,7 @@ namespace WordCloud.Structures
             Width = width;
             Height = height;
             CloudCenter = new Point(width / 2, height / 2);
-            _positioner = new SpiralPositioner(new Size(Width,Height));
+            _positioner = new SpiralPositioner(new Size(Width, Height));
             _pen = new Pen(Brushes.Purple, 1);
             _pen.Freeze();
         }
@@ -47,47 +46,47 @@ namespace WordCloud.Structures
         public CloudSpace(double width, double height, IRandomizer randomizer = null) : this(width, height)
         {
             _randomizer = randomizer ?? new CryptoRandomizer();
-            _positioner = new SpiralPositioner(new Size(Width,Height));
+            _positioner = new SpiralPositioner(new Size(Width, Height));
         }
 
-        private bool CalculateNextStartingPoint(WordGeo wordGeo)
+        private bool CalculateNextStartingPoint(WordDrawing wordDrawing)
         {
             if (!_positioner.GetNextPoint(out var x, out var y)) return false;
 
-            wordGeo.X = x;
-            wordGeo.Y = y;
+            wordDrawing.X = x;
+            wordDrawing.Y = y;
 
             return true;
         }
 
 
-        private void AdjustFinalPosition(byte[] newBytes, WordGeo wordGeo)
+        private void AdjustFinalPosition(byte[] newBytes, WordDrawing wordDrawing)
         {
-            var previousX = wordGeo.X;
-            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.X - wordGeo.X) > Buffer + 3)
+            var previousX = wordDrawing.X;
+            while (!HasCollision(newBytes, wordDrawing) && Math.Abs(CloudCenter.X - wordDrawing.X) > Buffer + 3)
             {
-                previousX = wordGeo.X;
-                wordGeo.X += wordGeo.X > CloudCenter.X ? -Buffer - 3 : Buffer + 3;
+                previousX = wordDrawing.X;
+                wordDrawing.X += wordDrawing.X > CloudCenter.X ? -Buffer - 3 : Buffer + 3;
             }
-            wordGeo.X = previousX;
+            wordDrawing.X = previousX;
 
-            var previousY = wordGeo.Y;
-            while (!HasCollision(newBytes, wordGeo) && Math.Abs(CloudCenter.Y - wordGeo.Y) > Buffer + 3)
+            var previousY = wordDrawing.Y;
+            while (!HasCollision(newBytes, wordDrawing) && Math.Abs(CloudCenter.Y - wordDrawing.Y) > Buffer + 3)
             {
-                previousY = wordGeo.Y;
-                wordGeo.Y += wordGeo.Y > CloudCenter.Y ? -Buffer - 3 : Buffer + 3;
+                previousY = wordDrawing.Y;
+                wordDrawing.Y += wordDrawing.Y > CloudCenter.Y ? -Buffer - 3 : Buffer + 3;
             }
-            wordGeo.Y = previousY;
+            wordDrawing.Y = previousY;
         }
 
 
-        private void CreateCollisionMap(WordGeo wordGeo)
+        private void CreateCollisionMap(WordDrawing wordDrawing)
         {
-            SetStartingPosition(wordGeo, StartPosition.Center);
+            SetStartingPosition(wordDrawing, StartPosition.Center);
             _collisionMapWidth = (int) Width;
             _collisionMapHeight = (int) Height;
 
-            var mainImageBytes = GetPixels(wordGeo, _collisionMapWidth, _collisionMapHeight);
+            var mainImageBytes = GetPixels(wordDrawing, _collisionMapWidth, _collisionMapHeight);
             var totalPixels = _collisionMapHeight * _collisionMapWidth;
 
             _collisionMap = new BitArray(totalPixels);
@@ -98,14 +97,14 @@ namespace WordCloud.Structures
             }
         }
 
-        public void SetStartingPosition(WordGeo wordGeo, StartPosition position)
+        public void SetStartingPosition(WordDrawing wordDrawing, StartPosition position)
         {
-            _positioner.Delta = wordGeo.Width / wordGeo.Height;
+            _positioner.Delta = wordDrawing.Width / wordDrawing.Height;
             switch (position)
             {
                 case StartPosition.Center:
-                    _positioner.StartX = CloudCenter.X - wordGeo.Center.X;
-                    _positioner.StartY = CloudCenter.Y - wordGeo.Center.Y;
+                    _positioner.StartX = CloudCenter.X - wordDrawing.Center.X;
+                    _positioner.StartY = CloudCenter.Y - wordDrawing.Center.Y;
                     break;
                 case StartPosition.Random:
                     var quad = _randomizer.RandomInt(4);
@@ -124,14 +123,14 @@ namespace WordCloud.Structures
                             xMod = -CloudCenter.X;
                             break;
                     }
-                    _positioner.StartX = xMod + _randomizer.RandomInt((int)(CloudCenter.X * 1.5), (int) (_collisionMapWidth - wordGeo.Width));
-                    _positioner.StartY = yMod + _randomizer.RandomInt((int)(CloudCenter.Y * 1.5), (int) (_collisionMapHeight - wordGeo.Height));
+                    _positioner.StartX = xMod + _randomizer.RandomInt((int) (CloudCenter.X * 1.5), (int) (_collisionMapWidth - wordDrawing.Width));
+                    _positioner.StartY = yMod + _randomizer.RandomInt((int) (CloudCenter.Y * 1.5), (int) (_collisionMapHeight - wordDrawing.Height));
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(position), position, null);
             }
 
-            CalculateNextStartingPoint(wordGeo);
+            CalculateNextStartingPoint(wordDrawing);
         }
 
         private void AddNewCollisionPoint(int index)
@@ -150,7 +149,7 @@ namespace WordCloud.Structures
         }
 
 
-        private bool HasCollision(IReadOnlyList<byte> newWordBytes, WordGeo newWord)
+        private bool HasCollision(IReadOnlyList<byte> newWordBytes, WordDrawing newWord)
         {
             if (IsOutOfBounds(newWord)) return true;
 
@@ -158,31 +157,33 @@ namespace WordCloud.Structures
 
             var testX = newWord.IntX;
             var testY = newWord.IntY;
-            var testWidth = newWord.IntWidth;
+            var testWidth = newWord.IntWidth * Pbgra32Bytes;
             var testHeight = newWord.IntHeight;
+            var mapPosition = testY * srcWidth + testX;
+            var testOffset = 0;
             for (var line = 0; line < testHeight; ++line)
             {
-                var mapPosition = (testY + line) * srcWidth + testX;
-                var testOffset = line * testWidth * Pbgra32Bytes;
-                for (var i = 0; i < testWidth * Pbgra32Bytes; i += Pbgra32Bytes)
+                for (var i = 0; i < testWidth; i += Pbgra32Bytes)
                 {
                     var mapIndex = mapPosition + i / Pbgra32Bytes;
 
                     var isCollisionPoint = newWordBytes[testOffset + i] != Pbgra32Alpha;
                     if (isCollisionPoint && _collisionMap[mapIndex]) return true;
                 }
+                mapPosition += srcWidth;
+                testOffset += testWidth;
             }
 
             return false;
         }
 
-        private byte[] GetPixels(WordGeo wordGeo, int width, int height)
+        private byte[] GetPixels(WordDrawing wordDrawing, int width, int height)
         {
             var bm = new RenderTargetBitmap(width, height, 96, 96, _pixelFormat);
             var dv = new DrawingVisual();
             using (var dc = dv.RenderOpen())
             {
-                dc.DrawGeometry(Brushes.Purple, _pen, wordGeo.Geo);
+                dc.DrawGeometry(Brushes.Purple, _pen, wordDrawing.Geo);
             }
             bm.Render(dv);
 
@@ -194,7 +195,7 @@ namespace WordCloud.Structures
             return newBytes;
         }
 
-        private void UpdateCollisionMap(IReadOnlyList<byte> newBytes, WordGeo newWord)
+        private void UpdateCollisionMap(IReadOnlyList<byte> newBytes, WordDrawing newWord)
         {
             if (newWord.IntBottom > _collisionMapHeight ||
                 newWord.IntRight > _collisionMapWidth ||
@@ -207,44 +208,45 @@ namespace WordCloud.Structures
             var srcWidth = _collisionMapWidth;
             var testX = newWord.IntX;
             var testY = newWord.IntY;
-            var testWidth = newWord.IntWidth;
+            var testWidth = newWord.IntWidth * Pbgra32Bytes;
             var testHeight = newWord.IntHeight;
-
+            var mapPosition = testY * srcWidth + testX;
+            var testOffset = 0;
             for (var line = 0; line < testHeight; ++line)
             {
-                var mapPosition = (testY + line) * srcWidth + testX;
-                var testOffset = line * testWidth * Pbgra32Bytes;
-
-                for (var i = 0; i < testWidth * Pbgra32Bytes; i += Pbgra32Bytes)
+                for (var i = 0; i < testWidth; i += Pbgra32Bytes)
                 {
                     if (newBytes[testOffset + i] > 0) AddNewCollisionPoint(mapPosition + i / Pbgra32Bytes);
                 }
+
+                mapPosition += srcWidth;
+                testOffset += testWidth;
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool IsOutOfBounds(WordGeo wordGeo)
+        private bool IsOutOfBounds(WordDrawing wordDrawing)
         {
-            return wordGeo.IntRight > _collisionMapWidth -Buffer || wordGeo.IntBottom > _collisionMapHeight - Buffer || wordGeo.X < 0 || wordGeo.Y < 0;
+            return wordDrawing.IntRight >= _collisionMapWidth - Buffer - 2 || wordDrawing.IntBottom >= _collisionMapHeight - Buffer - 2 || wordDrawing.X < 0 || wordDrawing.Y < 0;
         }
 
-        public bool AddWordGeometry(WordGeo wordGeo)
+        public bool AddWordGeometry(WordDrawing wordDrawing)
         {
             if (_collisionMap == null)
             {
-                CreateCollisionMap(wordGeo);
+                CreateCollisionMap(wordDrawing);
                 return true;
             }
 
-            var newBytes = GetPixels(wordGeo, wordGeo.IntWidth, wordGeo.IntHeight);
-            SetStartingPosition(wordGeo, DefaultStartingPosition);
+            var newBytes = GetPixels(wordDrawing, wordDrawing.IntWidth, wordDrawing.IntHeight);
+            SetStartingPosition(wordDrawing, _defaultStartingPosition);
 
             var attempts = 0;
-            while (HasCollision(newBytes, wordGeo))
+            while (HasCollision(newBytes, wordDrawing))
             {
                 do
                 {
-                    var result = CalculateNextStartingPoint(wordGeo);
+                    var result = CalculateNextStartingPoint(wordDrawing);
                     if (!result && attempts > RepositionAttempts)
                     {
                         FailedPlacements++;
@@ -252,18 +254,23 @@ namespace WordCloud.Structures
                     }
 
                     if (result) continue;
-                    DefaultStartingPosition = StartPosition.Random;
-                    SetStartingPosition(wordGeo, StartPosition.Random);
+                    _defaultStartingPosition = StartPosition.Random;
+                    SetStartingPosition(wordDrawing, StartPosition.Random);
                     attempts++;
-                } while (IsOutOfBounds(wordGeo));
+                } while (IsOutOfBounds(wordDrawing));
             }
 
-            if (DefaultStartingPosition == StartPosition.Random)
-                AdjustFinalPosition(newBytes, wordGeo);
+            if (_defaultStartingPosition == StartPosition.Random)
+                AdjustFinalPosition(newBytes, wordDrawing);
 
-            UpdateCollisionMap(newBytes, wordGeo);
+            UpdateCollisionMap(newBytes, wordDrawing);
 
             return true;
         }
+    }
+    internal enum StartPosition
+    {
+        Center,
+        Random,
     }
 }

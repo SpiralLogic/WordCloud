@@ -4,31 +4,33 @@ using System.Windows.Media;
 
 namespace WordCloud.Structures
 {
-    class WordGeo
+    internal class WordDrawing
     {
         private Rect _bounds;
         private readonly TransformGroup _transformGroup = new TransformGroup();
-        private readonly WordCloudEntry _wordEntry;
         private readonly TranslateTransform _translateTransform = new TranslateTransform();
+        private readonly WordCloudEntry _wordEntry;
         private readonly Geometry _geo;
 
-        public WordGeo(Geometry geo, WordCloudEntry wordEntry)
+        public WordDrawing(Geometry geo, WordCloudEntry wordEntry)
         {
             _geo = geo;
-            _bounds = geo.Bounds;
             _wordEntry = wordEntry;
+            _bounds = geo.Bounds;
+            Center = new Point(_bounds.Width / 2, _bounds.Height / 2);
 
             _geo.Transform = _transformGroup;
 
-            Center = new Point(_bounds.Width / 2, _bounds.Height / 2);
             var rotateTransform = new RotateTransform(_wordEntry.Angle, Center.X, Center.Y);
             _transformGroup.Children.Add(rotateTransform);
+
             _bounds = rotateTransform.TransformBounds(_bounds);
 
             _transformGroup.Children.Add(new TranslateTransform(-_bounds.X, -_bounds.Y));
 
             _bounds.X = 0;
             _bounds.Y = 0;
+            
             IntWidth = (int) Math.Ceiling(_bounds.Width);
             IntHeight = (int) Math.Ceiling(_bounds.Height);
             _transformGroup.Children.Add(_translateTransform);
@@ -64,8 +66,8 @@ namespace WordCloud.Structures
 
         public Point Center { get; }
 
-        public int IntWidth { get; }
-        public int IntHeight { get; }
+        public int IntWidth;
+        public int IntHeight;
 
         public int IntX => (int) Math.Ceiling(_bounds.X);
         public int IntY => (int) Math.Ceiling(_bounds.Y);
@@ -78,7 +80,7 @@ namespace WordCloud.Structures
             var geoDrawing = new GeometryDrawing
             {
                 Geometry = _geo,
-                Brush = _wordEntry.Color,
+                Brush = _wordEntry.Brush,
             };
 
             _translateTransform.X = _bounds.X;
@@ -91,6 +93,18 @@ namespace WordCloud.Structures
         public override string ToString()
         {
             return _wordEntry.Word;
+        }
+
+        public bool Contains(double x, double y)
+        {
+            if (x >= _bounds.X && x - _bounds.Width <= _bounds.X && y >= _bounds.Y)
+                return y - _bounds.Height <= _bounds.Y;
+            return false;
+        }
+
+        public Rect GetBounds()
+        {
+            return new Rect(X, Y, Width, Height);
         }
     }
 }
