@@ -192,10 +192,9 @@ namespace WordCloud.Structures
 
             bm.Render(dv);
 
-            var bitmap = new WriteableBitmap(bm);
-            var bitmapStride = (bitmap.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8;
-            var newBytes = new byte[bitmap.PixelHeight * bitmapStride];
-            bitmap.CopyPixels(newBytes, bitmapStride, 0);
+            var bitmapStride = (bm.PixelWidth * _pixelFormat.BitsPerPixel + 7) / 8;
+            var newBytes = new byte[bm.PixelHeight * bitmapStride];
+            bm.CopyPixels(newBytes, bitmapStride, 0);
 
             return newBytes;
         }

@@ -19,8 +19,12 @@ namespace WordCloud.Views
     /// </summary>
     public sealed partial class WordCloudControl : IDisposable
     {
-        private const int MaxWords = 300;
+        private const int MaxWords = 200;
         private const double WorkingAreaBuffer = 4.0D;
+        private const int WordAnimationThreshold = 200;
+        private const int RangeRotation = 160;
+        private const int MaxRotation = 80;
+
         public int CurrentWord;
 
         private IReadOnlyList<WordCloudEntry> _words;
@@ -36,12 +40,10 @@ namespace WordCloud.Views
         private CancellationTokenSource _cts;
         private Task _cloudGenerationTask;
         private readonly Duration _wordFadeInDuration = new Duration(TimeSpan.FromMilliseconds(200));
-        private readonly int _wordAnimationThreshold = 200;
-        private int _rangeRotation = 160;
-        private int _maxRotation = 80;
-        private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
 
+        private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Default;
+
         public int Failures => _cloudSpace.FailedPlacements;
 
         public WordCloudControl()
@@ -108,7 +110,7 @@ namespace WordCloud.Views
                     {
                         try
                         {
-                            if (_words.Count < _wordAnimationThreshold)
+                            if (_words.Count < WordAnimationThreshold)
                             {
                                 WordGeometryConsumerAnimated(geometryDrawings);
                             }
@@ -133,8 +135,6 @@ namespace WordCloud.Views
                     _cloudGenerationSemaphore.Release();
                 }
             }
-
-            //       RecenterFinishedWordGroup();
         }
 
         private void WordGeometryConsumerAnimated(BlockingCollection<GeometryDrawing> geometryDrawings)
@@ -158,7 +158,7 @@ namespace WordCloud.Views
                                 AccelerationRatio = 0.2
                             };
 
-                            if (_words.Count < _wordAnimationThreshold)
+                            if (_words.Count < WordAnimationThreshold)
                             {
                                 geometryDrawing = geometryDrawing.Clone(); // Need unfrozen for animations
                                 geometryDrawing.Brush.BeginAnimation(Brush.OpacityProperty, wordFadeAnimation);
@@ -200,7 +200,6 @@ namespace WordCloud.Views
                 CurrentWord++;
             }
 
-
             geometryDrawings.CompleteAdding();
         }
 
@@ -208,9 +207,9 @@ namespace WordCloud.Views
         {
             double maxWeight = wordList.First().Weight;
             var scaleArea = new Size(_cloudSpace.Width - 10, _cloudSpace.Height - 10);
-            foreach (var w in wordList)
+            foreach (var wordDrawing in wordList)
             {
-                w.Scale = w.Weight / maxWeight;
+                wordDrawing.ApplyScale(wordDrawing.Weight / maxWeight);
             }
 
             var longestDrawing = wordList.Max(w => w.Width);
@@ -224,7 +223,7 @@ namespace WordCloud.Views
 
             foreach (var wordDrawing in wordList)
             {
-                wordDrawing.Scale = scale;
+                wordDrawing.ApplyScale(scale);
             }
         }
 
@@ -348,7 +347,7 @@ namespace WordCloud.Views
                 {
                     if (wordList.Any())
                     {
-                        angle = -_maxRotation + _randomizer.RandomInt(_rangeRotation);
+                        angle = -MaxRotation + _randomizer.RandomInt(RangeRotation);
                     }
                 }
 
