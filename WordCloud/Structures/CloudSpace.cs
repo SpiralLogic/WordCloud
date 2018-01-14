@@ -31,7 +31,7 @@ namespace WordCloud.Structures
         private readonly Pen _pen;
         public int FailedPlacements { get; private set; }
 
-        private const int Buffer = 1;
+        private const int Buffer = 2;
 
         public CloudSpace(double width, double height)
         {
@@ -68,6 +68,7 @@ namespace WordCloud.Structures
                 previousX = wordDrawing.X;
                 wordDrawing.X += wordDrawing.X > CloudCenter.X ? -Buffer - 3 : Buffer + 3;
             }
+
             wordDrawing.X = previousX;
 
             var previousY = wordDrawing.Y;
@@ -76,6 +77,7 @@ namespace WordCloud.Structures
                 previousY = wordDrawing.Y;
                 wordDrawing.Y += wordDrawing.Y > CloudCenter.Y ? -Buffer - 3 : Buffer + 3;
             }
+
             wordDrawing.Y = previousY;
         }
 
@@ -103,8 +105,8 @@ namespace WordCloud.Structures
             switch (position)
             {
                 case StartPosition.Center:
-                    _positioner.StartX = CloudCenter.X - wordDrawing.Center.X;
-                    _positioner.StartY = CloudCenter.Y - wordDrawing.Center.Y;
+                    _positioner.StartX = CloudCenter.X - wordDrawing.Width / 2;
+                    _positioner.StartY = CloudCenter.Y - wordDrawing.Height / 2;
                     break;
                 case StartPosition.Random:
                     var quad = _randomizer.RandomInt(4);
@@ -123,6 +125,7 @@ namespace WordCloud.Structures
                             xMod = -CloudCenter.X;
                             break;
                     }
+
                     _positioner.StartX = xMod + _randomizer.RandomInt((int) (CloudCenter.X * 1.5), (int) (_collisionMapWidth - wordDrawing.Width));
                     _positioner.StartY = yMod + _randomizer.RandomInt((int) (CloudCenter.Y * 1.5), (int) (_collisionMapHeight - wordDrawing.Height));
                     break;
@@ -170,6 +173,7 @@ namespace WordCloud.Structures
                     var isCollisionPoint = newWordBytes[testOffset + i] != Pbgra32Alpha;
                     if (isCollisionPoint && _collisionMap[mapIndex]) return true;
                 }
+
                 mapPosition += srcWidth;
                 testOffset += testWidth;
             }
@@ -185,6 +189,7 @@ namespace WordCloud.Structures
             {
                 dc.DrawGeometry(Brushes.Purple, _pen, wordDrawing.Geo);
             }
+
             bm.Render(dv);
 
             var bitmap = new WriteableBitmap(bm);
@@ -268,6 +273,7 @@ namespace WordCloud.Structures
             return true;
         }
     }
+
     internal enum StartPosition
     {
         Center,

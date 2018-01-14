@@ -61,8 +61,8 @@ namespace WordCloud.Views
 
         private readonly Dictionary<string, int> _words = new Dictionary<string, int>
         {
-            {"coding", 15000},
-            {"windows", 10000},
+            {"coding", 35000},
+            {"windows", 1000},
             {"wawa", 9980},
             {"mac", 9970},
             {"use", 9960},
