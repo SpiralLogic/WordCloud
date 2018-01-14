@@ -19,7 +19,7 @@ namespace WordCloud.Views
     /// </summary>
     public sealed partial class WordCloudControl : IDisposable
     {
-        private const int MaxWords = 200;
+        private const int MaxWords = 100;
         private const double WorkingAreaBuffer = 4.0D;
         private const int WordAnimationThreshold = 200;
         private const int RangeRotation = 160;
@@ -206,7 +206,7 @@ namespace WordCloud.Views
         private void CalculateAndPerformScaling(ICollection<WordDrawing> wordList)
         {
             double maxWeight = wordList.First().Weight;
-            var scaleArea = new Size(_cloudSpace.Width - 10, _cloudSpace.Height - 10);
+            var scaleArea = new Size(_cloudSpace.Width, _cloudSpace.Height);
             foreach (var wordDrawing in wordList)
             {
                 wordDrawing.ApplyScale(wordDrawing.Weight / maxWeight);
@@ -216,7 +216,7 @@ namespace WordCloud.Views
             var tallestDrawing = wordList.Max(w => w.Height);
 
             var requiredSize = DetermineRequiredArea(wordList);
-            var scale = Math.Max((scaleArea.Width - 100) / requiredSize.Width, (scaleArea.Width - 100) / requiredSize.Height);
+            var scale = Math.Max((scaleArea.Width - 50) / requiredSize.Width, (scaleArea.Width - 50) / requiredSize.Height);
 
             if (scale * longestDrawing > scaleArea.Width) scale = (scaleArea.Width) / longestDrawing;
             if (scale * tallestDrawing > scaleArea.Height) scale = (scaleArea.Height) / tallestDrawing;
@@ -229,7 +229,7 @@ namespace WordCloud.Views
 
         private Size DetermineRequiredArea(ICollection<WordDrawing> words)
         {
-            var length = Math.Max(words.First().Width, words.First().Height) + 10;
+            var length = Math.Max(words.First().Width, words.First().Height) ;
             var currentWidth = length;
             var currentHeight = length;
             var currentIndex = 0;
@@ -281,8 +281,8 @@ namespace WordCloud.Views
                     if (word.Width > word.Height)
                         adjust = word.Height;
 
-                    currentHeight += adjust + 10;
-                    currentWidth += adjust + 10;
+                    currentHeight += adjust;
+                    currentWidth += adjust;
                     currentIndex = 0;
                 }
 
@@ -338,7 +338,7 @@ namespace WordCloud.Views
 
                 if (CurrentTheme.WordRotation == WordCloudThemeWordRotation.Mixed)
                 {
-                    if (wordList.Any() && _randomizer.RandomInt(10) >= 70)
+                    if (wordList.Any() && _randomizer.RandomInt(10) >= 7)
                     {
                         angle = -90;
                     }
@@ -389,7 +389,7 @@ namespace WordCloud.Views
 
         public void Dispose()
         {
-            _cloudGenerationSemaphore?.Dispose();
+            _cloudGenerationSemaphore.Dispose();
             _cts?.Dispose();
             _cloudGenerationTask?.Dispose();
         }
