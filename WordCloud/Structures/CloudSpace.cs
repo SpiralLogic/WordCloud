@@ -19,12 +19,13 @@ namespace WordCloud.Structures
         private const int Pbgra32Bytes = 4;
         public double Width { get; }
         public double Height { get; }
+
         public Point CloudCenter;
-
         private BitArray _collisionMap;
-        private int _collisionMapWidth;
 
-        private int _collisionMapHeight;
+        private readonly int _collisionMapWidth;
+        private readonly int _collisionMapHeight;
+
         private readonly Pen _pen;
         public int FailedPlacements { get; private set; }
 
@@ -34,7 +35,11 @@ namespace WordCloud.Structures
         {
             Width = width;
             Height = height;
+            _collisionMapWidth = (int)Width;
+            _collisionMapHeight = (int)Height;
+
             CloudCenter = new Point(width / 2, height / 2);
+
             _positioner = new SpiralPositioner(new Size(Width, Height));
             _pen = new Pen(Brushes.Purple, 1);
             _pen.Freeze();
@@ -82,9 +87,7 @@ namespace WordCloud.Structures
         {
             SetStartingPosition(wordDrawing, StartPosition.Center);
 
-            _collisionMapWidth = (int) Width;
-            _collisionMapHeight = (int) Height;
-
+          
             _collisionMap = CreateBitArrayFromWord(wordDrawing, _collisionMapWidth, _collisionMapHeight, AddNewCollisionPoint);
         }
 
