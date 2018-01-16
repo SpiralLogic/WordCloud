@@ -24,7 +24,6 @@ namespace WordCloud.Views
             foreach (var kvp in _words.OrderByDescending(x => x.Value))
             {
                 wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key), kvp.Value));
-                //      wordlist.Add(new FrequencyTableRow<WordGroup>(new WordGroup(kvp.Key + "z"), kvp.Value));
                 count += kvp.Value;
             }
 
@@ -47,6 +46,11 @@ namespace WordCloud.Views
             Time.Text = s.ElapsedMilliseconds.ToString();
             Failures.Text = WordCloudControl.Failures.ToString();
             Debug.WriteLine(s.ElapsedMilliseconds);
+        }
+
+        private void Reset(object sender, RoutedEventArgs e)
+        {
+            WordCloudControl.Reset();
         }
 
         public WordCloudData WordCloudData
@@ -372,5 +376,6 @@ namespace WordCloud.Views
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
     }
 }
