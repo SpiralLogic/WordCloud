@@ -27,14 +27,7 @@ namespace WordCloud.Structures
         public double Height { get; }
 
         public Point CloudCenter;
-        private BitArray _collisionMap;
-
-        private readonly int _collisionMapWidth;
-        private readonly int _collisionMapHeight;
-
-        private readonly Pen _pen;
         public int FailedPlacements { get; private set; }
-        public Point CloudCenter;
 
         public CloudSpace(double width, double height)
         {
@@ -108,7 +101,7 @@ namespace WordCloud.Structures
             SetStartingPosition(wordDrawing, StartPosition.Center);
 
           
-            _collisionMap = CreateBitArrayFromWord(wordDrawing, _collisionMapWidth, _collisionMapHeight, AddNewCollisionPoint);
+            _collisionMap = CreateBitArrayFromGeometry(wordDrawing.Geo, _collisionMapWidth, _collisionMapHeight, AddNewCollisionPoint);
         }
 
         public void SetStartingPosition(WordDrawing wordDrawing, StartPosition position)
