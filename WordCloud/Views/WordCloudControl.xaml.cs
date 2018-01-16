@@ -63,6 +63,14 @@ namespace WordCloud.Views
         private void Setup()
         {
             _cloudSpace = new CloudSpace(Width - WorkingAreaBuffer, Height - WorkingAreaBuffer, _randomizer);
+
+            //var workArea = new EllipseGeometry(_cloudSpace.CloudCenter, _cloudSpace.Width/2, _cloudSpace.Height/2);
+
+           // var tg = new FormattedText("James Ballard",CultureInfo.CurrentCulture, FlowDirection.LeftToRight,CurrentTheme.Typeface,100,Brushes.BlueViolet, DpiScale.PixelsPerDip);
+            
+
+         //   _cloudSpace.SetCustomWorkArea(tg.BuildGeometry(new Point(0,0)));
+
             MaxWidth = Width;
             MaxHeight = Height;
 
