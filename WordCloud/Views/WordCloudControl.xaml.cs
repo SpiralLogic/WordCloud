@@ -21,7 +21,7 @@ namespace WordCloud.Views
     {
         private const int MaxWords = 100;
         private const double WorkingAreaBuffer = 4.0D;
-        private const int WordAnimationThreshold = 200;
+        private const int WordAnimationThreshold = 1;
         private const int RangeRotation = 160;
         private const int MaxRotation = 80;
 
@@ -78,6 +78,19 @@ namespace WordCloud.Views
             _mainDrawingGroup.Children.Add(_bgDrawingGroup);
             _mainDrawingGroup.Children.Add(_wordDrawingGroup);
             _wordDrawingGroup.Transform = _finalTransformGroup;
+        }
+
+        public void Reset()
+        {
+            _cloudSpace = null;
+
+            _mainDrawingGroup.Children.Clear();
+            _bgDrawingGroup.Children.Clear();
+            _finalTransformGroup.Children.Clear();
+            _wordDrawingGroup.Children.Clear();
+
+            BaseImage.Source = new DrawingImage { Drawing = _mainDrawingGroup };
+            BaseImage.Stretch = Stretch.None;
         }
 
         private async Task AddWordsInternal()

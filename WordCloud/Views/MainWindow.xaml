@@ -9,6 +9,7 @@
     <StackPanel>
         <views:WordCloudControl DataContext="{Binding WordCloudData}" x:Name="WordCloudControl" Height="600" Width="600"></views:WordCloudControl>
         <Button  Click="DoWordCloud" Content="do"></Button>
+        <Button  Click="Reset" Content="reset"></Button>
         <TextBlock Name="Time"></TextBlock>
         <TextBlock Name="Failures"></TextBlock>
     </StackPanel>
