@@ -16,8 +16,8 @@ namespace WordCloud.Structures
         private readonly IRandomizer _randomizer;
         private readonly IPositioner _positioner;
         private readonly Pen _pen;
-        private readonly int _collisionMapWidth;
-        private readonly int _collisionMapHeight;
+        private int _collisionMapWidth;
+        private int _collisionMapHeight;
 
         private const int RepositionAttempts = 4;
         private const int Pbgra32Bytes = 4;
@@ -33,8 +33,8 @@ namespace WordCloud.Structures
         {
             Width = width;
             Height = height;
-            _collisionMapWidth = (int)Width;
-            _collisionMapHeight = (int)Height;
+            _collisionMapWidth = (int) Width;
+            _collisionMapHeight = (int) Height;
 
             CloudCenter = new Point(width / 2, height / 2);
 
@@ -59,21 +59,6 @@ namespace WordCloud.Structures
             return true;
         }
 
-        public void SetCustomWorkArea(Geometry workarea)
-        {
-            if (_collisionMap!=null) return;
-
-            var workAreaBounds = workarea.Bounds;
-            var scale = workAreaBounds.Height > workAreaBounds.Width ? _collisionMapWidth / workAreaBounds.Height : _collisionMapWidth / workAreaBounds.Width;
-
-            var transformGroup = new TransformGroup();
-            transformGroup.Children.Add(workarea.Transform);
-            transformGroup.Children.Add(new ScaleTransform(scale,scale, workAreaBounds.Width/2, workAreaBounds.Height/2));
-
-            workarea.Transform = transformGroup;
-
-            _collisionMap = CreateBitArrayFromGeometry(workarea, _collisionMapWidth, _collisionMapHeight, (wa, i) => wa[i] = wa[i]);
-        }
 
         private void AdjustFinalPosition(BitArray newBytes, WordDrawing wordDrawing)
         {
@@ -100,7 +85,9 @@ namespace WordCloud.Structures
         {
             SetStartingPosition(wordDrawing, StartPosition.Center);
 
-          
+            _collisionMapWidth = (int) Width;
+            _collisionMapHeight = (int) Height;
+
             _collisionMap = CreateBitArrayFromGeometry(wordDrawing.Geo, _collisionMapWidth, _collisionMapHeight, AddNewCollisionPoint);
         }
 
@@ -156,30 +143,38 @@ namespace WordCloud.Structures
             }
         }
 
+        private int _wordsFirstPixelIndex = 0;
+        private int _wordsLastPixelOffset = 1;
+
         private bool HasCollision(BitArray newWordBitArray, WordDrawing newWord)
         {
             if (IsOutOfBounds(newWord)) return true;
-
             var srcWidth = _collisionMapWidth;
 
             var testX = newWord.IntX;
             var testY = newWord.IntY;
             var testWidth = newWord.IntWidth;
-            var testHeight = newWord.IntHeight;
-            var mapPosition = testY * srcWidth + testX;
-            var testOffset = 0;
-            for (var line = 0; line < testHeight; ++line)
+            var mapStart = srcWidth * testY + testX;
+            var testHalfway = (newWordBitArray.Length + 1) / 2;
+            for (var i = 0; i < testHalfway; ++i)
             {
-                for (var i = 0; i < testWidth; i++)
+                var bitIndex = i + _wordsFirstPixelIndex; // because % is damn slow
+                var bitIndex2 = newWordBitArray.Length - _wordsLastPixelOffset - i;
+
+                if ((bitIndex > _wordsFirstPixelIndex && newWordBitArray[bitIndex] && _collisionMap[mapStart + bitIndex / testWidth * srcWidth + bitIndex % testWidth]) ||
+                    (bitIndex2 < newWordBitArray.Length - _wordsLastPixelOffset && newWordBitArray[bitIndex2] && _collisionMap[mapStart + bitIndex2 / testWidth * srcWidth + bitIndex2 % testWidth]))
                 {
-                    var mapIndex = mapPosition + i;
-                    if (newWordBitArray[testOffset + i] && _collisionMap[mapIndex]) return true;
+                    return true;
                 }
 
-                mapPosition += srcWidth;
-                testOffset += testWidth;
+                if (_wordsFirstPixelIndex == 0 && newWordBitArray[bitIndex])
+                    _wordsFirstPixelIndex = i;
+                if (_wordsLastPixelOffset == 1 && newWordBitArray[bitIndex2])
+                    _wordsLastPixelOffset = 1;
             }
 
+            _wordsFirstPixelIndex = 0;
+            _wordsLastPixelOffset = 1;
             return false;
         }
 
@@ -203,7 +198,9 @@ namespace WordCloud.Structures
 
             for (var i = 0; i < totalPixels - Pbgra32Bytes; ++i)
             {
-                bitArray[i] = newBytes[i * Pbgra32Bytes + 3] <= 0;
+                if (newBytes[i * Pbgra32Bytes + 3] <= 0) continue;
+
+                bitArray[i] = true;
                 collisionPointAction?.Invoke(bitArray, i);
             }
 
