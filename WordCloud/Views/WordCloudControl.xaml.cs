@@ -44,7 +44,7 @@ namespace WordCloud.Views
         private DpiScale DpiScale => VisualTreeHelper.GetDpi(this);
         public WordCloudTheme CurrentTheme { get; set; } = WordCloudThemes.Default;
 
-        public int Failures => _cloudSpace.FailedPlacements;
+        public int Failures => _cloudSpace.FailedPlacements.Count;
 
         public WordCloudControl()
         {

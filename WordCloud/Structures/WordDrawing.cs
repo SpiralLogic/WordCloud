@@ -12,7 +12,6 @@ namespace WordCloud.Structures
         private readonly TransformGroup _transformGroup = new TransformGroup();
         private readonly TranslateTransform _translateTransform = new TranslateTransform();
         private readonly TransformGroup _scaleTransformGroup = new TransformGroup();
-        private readonly WordCloudEntry _wordEntry;
         private readonly Geometry _geo;
 
         public WordDrawing(WordCloudEntry wordEntry, WordCloudTheme theme, DpiScale scale)
@@ -27,11 +26,11 @@ namespace WordCloud.Structures
 
             var textGeometry = text.BuildGeometry(new Point(0, 0));
             _geo = textGeometry;
-            _wordEntry = wordEntry;
+            WordCloudEntry = wordEntry;
             _bounds = textGeometry.Bounds;
             _geo.Transform = _transformGroup;
 
-            var rotateTransform = new RotateTransform(_wordEntry.Angle, _bounds.Width / 2, _bounds.Height / 2);
+            var rotateTransform = new RotateTransform(WordCloudEntry.Angle, _bounds.Width / 2, _bounds.Height / 2);
 
             _transformGroup.Children.Add(rotateTransform);
             _bounds = rotateTransform.TransformBounds(_bounds);
@@ -61,6 +60,8 @@ namespace WordCloud.Structures
             }
         }
 
+        public WordCloudEntry WordCloudEntry { get; }
+
         public double X
         {
             get => _bounds.X;
@@ -79,7 +80,7 @@ namespace WordCloud.Structures
         public double Width => _bounds.Width;
         public double Height => _bounds.Height;
 
-        public int Weight => _wordEntry.Weight;
+        public int Weight => WordCloudEntry.Weight;
 
         public void ApplyScale(double scale)
         {
@@ -88,10 +89,6 @@ namespace WordCloud.Structures
 
             if (_initialPlacementTransform.Inverse != null) _bounds = _initialPlacementTransform.Inverse.TransformBounds(_bounds);
             _bounds = scaleTransform.TransformBounds(_bounds);
-
-            //scaleTransform.CenterX = _bounds.Width / 2;
-            //scaleTransform.CenterY = _bounds.Height/ 2;
-
 
             IntWidth = (int) Math.Ceiling(_bounds.Width);
             IntHeight = (int) Math.Ceiling(_bounds.Height);
@@ -106,6 +103,7 @@ namespace WordCloud.Structures
         public int IntWidth;
         public int IntHeight;
         private readonly TranslateTransform _initialPlacementTransform;
+        private Rect _frozenBounds;
 
         public int IntX => (int) Math.Ceiling(_bounds.X);
         public int IntY => (int) Math.Ceiling(_bounds.Y);
@@ -118,32 +116,37 @@ namespace WordCloud.Structures
             var geoDrawing = new GeometryDrawing
             {
                 Geometry = _geo,
-                Brush = _wordEntry.Brush,
+                Brush = WordCloudEntry.Brush,
             };
 
             _translateTransform.X = _bounds.X;
             _translateTransform.Y = _bounds.Y;
 
-            if (!geoDrawing.IsFrozen) geoDrawing.Freeze();
-            //      _bounds = geoDrawing.Bounds;
+            if (!geoDrawing.IsFrozen)
+            {
+                geoDrawing.Freeze();
+                _frozenBounds = new Rect(X, Y, Width, Height);
+            }
+
             return geoDrawing;
         }
 
         public override string ToString()
         {
-            return _wordEntry.Word;
+            return WordCloudEntry.Word;
         }
 
         public bool Contains(double x, double y)
         {
             if (x >= _bounds.X && x - _bounds.Width <= _bounds.X && y >= _bounds.Y)
                 return y - _bounds.Height <= _bounds.Y;
+            
             return false;
         }
 
         public Rect GetBounds()
         {
-            return new Rect(X, Y, Width, Height);
+            return _geo.IsFrozen ? _frozenBounds : new Rect(X, Y, Width, Height);
         }
     }
 }
